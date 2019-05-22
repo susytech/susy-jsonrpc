@@ -1,0 +1,27 @@
+[package]
+description = "Blazing fast http server for JSON-RPC 2.0."
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-minihttp-server"
+version = "9.0.0"
+authors = ["tomusdrw <tomasz@superstring.ch>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "server"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_minihttp_server/index.html"
+
+[dependencies]
+bytes = { version="0.4", registry="susytech" }
+susy-jsonrpc-core = { version = "9.0", registry="susytech" }
+susy-jsonrpc-server-utils = { version = "9.0", registry="susytech" }
+log = { version="0.4", registry="susytech" }
+parking_lot = { version="0.6", registry="susytech" }
+tokio-minihttp = { version="0.1.0", registry="susytech" }
+tokio-proto = { version="0.1.0", registry="susytech" }
+tokio-service = { version="0.1", registry="susytech" }
+
+[dev-dependencies]
+env_logger = { version="0.5", registry="susytech" }
+openssl = {version = "0.10", features = ["vendored"]}
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

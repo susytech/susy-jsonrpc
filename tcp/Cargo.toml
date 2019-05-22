@@ -1,0 +1,23 @@
+[package]
+name = "susy-jsonrpc-tcp-server"
+description = "TCP/IP server for JSON-RPC"
+version = "9.0.0"
+authors = ["NikVolf <nikvolf@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_tcp_server/index.html"
+
+[dependencies]
+log = { version = "0.4", registry="susytech" }
+parking_lot = { version = "0.6", registry="susytech" }
+tokio-service = { version = "0.1", registry="susytech" }
+susy-jsonrpc-core = { version = "9.0", registry="susytech" }
+susy-jsonrpc-server-utils = { version = "9.0", registry="susytech" }
+
+[dev-dependencies]
+lazy_static = { version = "1.0", registry="susytech" }
+env_logger = { version = "0.5", registry="susytech" }
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

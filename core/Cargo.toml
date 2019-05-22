@@ -1,0 +1,28 @@
+[package]
+description = "Transport agnostic rust implementation of JSON-RPC 2.0 Specification."
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-core"
+version = "9.0.0"
+authors = ["debris <marek.kotewicz@gmail.com>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "serde"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_core/index.html"
+
+categories = [
+	"asynchronous",
+	"network-programming",
+	"web-programming::http-client",
+	"web-programming::http-server",
+	"web-programming::websocket",
+]
+
+[dependencies]
+log = { version="0.4", registry="susytech" }
+futures = { version = "~0.1.6", registry="susytech" }
+serde = { version = "1.0", registry="susytech" }
+serde_json = { version = "1.0", registry="susytech" }
+serde_derive = { version = "1.0", registry="susytech" }
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

@@ -1,0 +1,17 @@
+[package]
+name = "susy-jsonrpc-test"
+description = "Simple test framework for JSON-RPC."
+version = "9.0.0"
+authors = ["Tomasz Drwięga <tomasz@superstring.ch>"]
+license = "MIT"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_test/index.html"
+
+[dependencies]
+susy-jsonrpc-core = { path = "../core", version = "9.0" }
+serde = "1.0"
+serde_json = "1.0"
+
+[dev-dependencies]
+susy-jsonrpc-macros = { path = "../macros", version = "9.0" }

@@ -1,0 +1,21 @@
+[package]
+description = "Rust http server using JSONRPC 2.0."
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-http-server"
+version = "9.0.0"
+authors = ["debris <marek.kotewicz@gmail.com>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "server"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_http_server/index.html"
+
+[dependencies]
+hyper = { version="0.12", registry="susytech" }
+susy-jsonrpc-core = { version = "9.0", registry="susytech" }
+susy-jsonrpc-server-utils = { version = "9.0", registry="susytech" }
+log = { version="0.4", registry="susytech" }
+net2 = { version="0.2", registry="susytech" }
+unicase = { version="2.0", registry="susytech" }
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}
