@@ -1,0 +1,28 @@
+[package]
+description = "Blazing fast http server for JSON-RPC 2.0."
+homepage = "https://github.com/paritytech/jsonrpc"
+repository = "https://github.com/paritytech/jsonrpc"
+license = "MIT"
+name = "jsonrpc-minihttp-server"
+version = "8.0.0"
+authors = ["tomusdrw <tomasz@parity.io>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "server"]
+documentation = "https://paritytech.github.io/jsonrpc/jsonrpc_minihttp_server/index.html"
+
+[dependencies]
+bytes = { version="0.4", registry="susytech" }
+susy-jsonrpc-core = { version = "8.0", registry="susytech" }
+susy-jsonrpc-server-utils = { version = "8.0", registry="susytech" }
+log = { version="0.3", registry="susytech" }
+parking_lot = { version="0.4", registry="susytech" }
+tokio-minihttp = { version="0.1.0", registry="susytech"}
+tokio-proto = { version="0.1.1", registry="susytech" }
+tokio-service = { version="0.1", registry="susytech" }
+
+[dev-dependencies]
+env_logger = { version = "0.4", registry="susytech" }
+reqwest = { version = "0.9" }
+
+[badges]
+travis-ci = { repository = "paritytech/jsonrpc", branch = "master"}
+

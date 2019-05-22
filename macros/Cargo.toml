@@ -1,0 +1,22 @@
+[package]
+description = "Helper macros for susy-jsonrpc-core"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-macros"
+version = "8.0.0"
+authors = ["rphmeier <robert@superstring.ch>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "macros"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_macros/index.html"
+
+[dependencies]
+serde = { version = "1.0", registry="susytech"}
+susy-jsonrpc-core = { version = "8.0", registry="susytech" }
+susy-jsonrpc-pubsub = { version = "8.0", registry="susytech" }
+
+[dev-dependencies]
+serde_json = "1.0"
+susy-jsonrpc-tcp-server = { version = "8.0", registry="susytech" }
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

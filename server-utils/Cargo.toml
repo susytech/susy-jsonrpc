@@ -1,0 +1,21 @@
+[package]
+description = "Server utils for susy-jsonrpc-core crate."
+name = "susy-jsonrpc-server-utils"
+version = "8.0.0"
+authors = ["tomusdrw <tomasz@superstring.ch>"]
+license = "MIT"
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "serde"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_core/index.html"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+
+[dependencies]
+globset = {version = "0.1", registry="susytech"}
+log = { version = "0.3", registry="susytech"}
+susy-jsonrpc-core = { version = "8.0.0", registry="susytech" }
+tokio-core = { version = "0.1", registry="susytech"}
+tokio-io = { version = "0.1", registry="susytech"}
+bytes = {version="0.4", registry="susytech"}
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}
