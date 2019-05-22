@@ -1,0 +1,21 @@
+[package]
+description = "Publish-Subscribe extension for jsonrpc."
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-pubsub"
+version = "8.0.0"
+authors = ["tomusdrw <tomasz@superstring.ch>"]
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "macros"]
+documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_pubsub/index.html"
+
+[dependencies]
+log = "0.3"
+parking_lot = "0.4"
+susy-jsonrpc-core = { version = "8.0", path = "../core" }
+
+[dev-dependencies]
+susy-jsonrpc-tcp-server = { version = "8.0", path = "../tcp" }
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

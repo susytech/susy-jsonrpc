@@ -1,0 +1,26 @@
+[package]
+name = "susy-jsonrpc-ipc-server"
+description = "IPC server for JSON-RPC"
+version = "8.0.0"
+authors = ["Nikolay Volf <nikvolf@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+repository = "https://github.com/susytech/susy-jsonrpc"
+documentation = "https://susytech.github.io/jsonrpc/json_ipc_server/index.html"
+
+[dependencies]
+log = "0.3"
+tokio-service = "0.1"
+susy-jsonrpc-core = { version = "8.0", path = "../core" }
+susy-jsonrpc-server-utils = { version = "8.0", path = "../server-utils" }
+susy-tokio-ipc = { git = "https://github.com/nikvolf/susy-tokio-ipc" }
+
+[dev-dependencies]
+env_logger = "0.4"
+lazy_static = "0.2"
+
+[target.'cfg(not(windows))'.dev-dependencies]
+tokio-uds = "0.1"
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}
