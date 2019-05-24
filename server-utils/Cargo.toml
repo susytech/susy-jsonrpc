@@ -1,5 +1,5 @@
 [package]
-authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+authors = ["Susy Technologies <admin@susy.io>"]
 description = "Server utils for susy-jsonrpc-core crate."
 documentation = "https://docs.rs/susy-jsonrpc-server-utils/"
 edition = "2018"
@@ -11,15 +11,15 @@ repository = "https://github.com/susytech/susy-jsonrpc"
 version = "10.0.1"
 
 [dependencies]
-bytes = {version="0.4",registry="susytech"}
-globset = {version="0.4",registry="susytech"}
-susy-jsonrpc-core = { version = "10.0",registry="susytech"}
-lazy_static = {version="1.1.0",registry="susytech"}
-log = {version="0.4",registry="susytech"}
-num_cpus = {version="1.8",registry="susytech"}
-tokio = { version = "0.1",registry="susytech"}
-tokio-codec = { version = "0.1",registry="susytech"}
-unicase = {version="2.0",registry="susytech"}
+bytes = "0.4"
+globset = "0.4"
+susy-jsonrpc-core = { version = "10.0", path = "../core" }
+lazy_static = "1.1.0"
+log = "0.4"
+num_cpus = "1.8"
+tokio = { version = "0.1" }
+tokio-codec = { version = "0.1" }
+unicase = "2.0"
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

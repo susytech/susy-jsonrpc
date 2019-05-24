@@ -309,10 +309,10 @@ mod tests {
 	fn should_parse_origin() {
 		use self::OriginProtocol::*;
 
-		assert_eq!(Origin::parse("http://superstring.ch"), Origin::new(Http, "superstring.ch", None));
-		assert_eq!(Origin::parse("http://superstring.ch:8443"), Origin::new(Https, "superstring.ch", Some(8443)));
+		assert_eq!(Origin::parse("http://susy.io"), Origin::new(Http, "susy.io", None));
+		assert_eq!(Origin::parse("http://superstring.ch:8443"), Origin::new(Https, "susy.io", Some(8443)));
 		assert_eq!(Origin::parse("chrome-extension://124.0.0.1"), Origin::new(Custom("chrome-extension".into()), "124.0.0.1", None));
-		assert_eq!(Origin::parse("superstring.ch/somepath"), Origin::new(Http, "superstring.ch", None));
+		assert_eq!(Origin::parse("susy.io/somepath"), Origin::new(Http, "susy.io", None));
 		assert_eq!(Origin::parse("127.0.0.1:8545/somepath"), Origin::new(Http, "127.0.0.1", Some(8545)));
 	}
 
@@ -368,14 +368,14 @@ mod tests {
 	#[test]
 	fn should_return_domain_when_all_are_allowed() {
 		// given
-		let origin = Some("superstring.ch");
+		let origin = Some("susy.io");
 		let host = None;
 
 		// when
 		let res = get_cors_allow_origin(origin, host, &None);
 
 		// then
-		assert_eq!(res, AllowCors::Ok("superstring.ch".into()));
+		assert_eq!(res, AllowCors::Ok("susy.io".into()));
 	}
 
 	#[test]
@@ -411,7 +411,7 @@ mod tests {
 	#[test]
 	fn should_return_none_for_not_matching_origin() {
 		// given
-		let origin = Some("http://superstring.ch".into());
+		let origin = Some("http://susy.io".into());
 		let host = None;
 
 		// when
@@ -428,14 +428,14 @@ mod tests {
 	#[test]
 	fn should_return_specific_origin_if_we_allow_any() {
 		// given
-		let origin = Some("http://superstring.ch".into());
+		let origin = Some("http://susy.io".into());
 		let host = None;
 
 		// when
 		let res = get_cors_allow_origin(origin, host, &Some(vec![AccessControlAllowOrigin::Any]));
 
 		// then
-		assert_eq!(res, AllowCors::Ok(AccessControlAllowOrigin::Value("http://superstring.ch".into())));
+		assert_eq!(res, AllowCors::Ok(AccessControlAllowOrigin::Value("http://susy.io".into())));
 	}
 
 	#[test]
@@ -475,25 +475,25 @@ mod tests {
 	#[test]
 	fn should_return_specific_origin_if_there_is_a_match() {
 		// given
-		let origin = Some("http://superstring.ch".into());
+		let origin = Some("http://susy.io".into());
 		let host = None;
 
 		// when
 		let res = get_cors_allow_origin(
 			origin,
 			host,
-			&Some(vec![AccessControlAllowOrigin::Value("http://sophon.org".into()), AccessControlAllowOrigin::Value("http://superstring.ch".into())]),
+			&Some(vec![AccessControlAllowOrigin::Value("http://sophon.org".into()), AccessControlAllowOrigin::Value("http://susy.io".into())]),
 		);
 
 		// then
-		assert_eq!(res, AllowCors::Ok(AccessControlAllowOrigin::Value("http://superstring.ch".into())));
+		assert_eq!(res, AllowCors::Ok(AccessControlAllowOrigin::Value("http://susy.io".into())));
 	}
 
 	#[test]
 	fn should_support_wildcards() {
 		// given
-		let origin1 = Some("http://superstring.ch".into());
-		let origin2 = Some("http://superstring.cht".into());
+		let origin1 = Some("http://susy.io".into());
+		let origin2 = Some("http://susy.iot".into());
 		let origin3 = Some("chrome-extension://test".into());
 		let host = None;
 		let allowed = Some(vec![
@@ -507,7 +507,7 @@ mod tests {
 		let res3 = get_cors_allow_origin(origin3, host, &allowed);
 
 		// then
-		assert_eq!(res1, AllowCors::Ok(AccessControlAllowOrigin::Value("http://superstring.ch".into())));
+		assert_eq!(res1, AllowCors::Ok(AccessControlAllowOrigin::Value("http://susy.io".into())));
 		assert_eq!(res2, AllowCors::Invalid);
 		assert_eq!(res3, AllowCors::Ok(AccessControlAllowOrigin::Value("chrome-extension://test".into())));
 	}

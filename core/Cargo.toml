@@ -1,5 +1,5 @@
 [package]
-authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+authors = ["Susy Technologies <admin@susy.io>"]
 description = "Transport agnostic rust implementation of JSON-RPC 2.0 Specification."
 documentation = "https://docs.rs/susy-jsonrpc-core/"
 edition = "2018"

@@ -1,5 +1,5 @@
 [package]
-authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+authors = ["Susy Technologies <admin@susy.io>"]
 description = "WebSockets server for JSON-RPC"
 documentation = "https://docs.rs/susy-jsonrpc-ws-server/"
 edition = "2018"
@@ -10,13 +10,13 @@ repository = "https://github.com/susytech/susy-jsonrpc"
 version = "10.0.1"
 
 [dependencies]
-error-chain = { version = "0.12", registry="susytech"}
-susy-jsonrpc-core = { version = "10.0", registry="susytech"}
-susy-jsonrpc-server-utils = { version = "10.0", registry="susytech"}
-log = { version = "0.4", registry="susytech"}
-parking_lot = { version = "0.7", registry="susytech"}
-slab = { version = "0.4", registry="susytech"}
-susy-ws = { version = "0.8", registry="susytech"}
+error-chain = "0.12"
+susy-jsonrpc-core = { version = "10.0", path = "../core" }
+susy-jsonrpc-server-utils = { version = "10.0", path = "../server-utils" }
+log = "0.4"
+parking_lot = "0.7"
+slab = "0.4"
+susy-ws = "0.8"
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

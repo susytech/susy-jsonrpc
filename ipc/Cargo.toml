@@ -1,5 +1,5 @@
 [package]
-authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+authors = ["Susy Technologies <admin@susy.io>"]
 description = "IPC server for JSON-RPC"
 documentation = "https://docs.rs/susy-jsonrpc-ipc-server/"
 edition = "2018"

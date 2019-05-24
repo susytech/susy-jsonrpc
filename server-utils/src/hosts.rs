@@ -177,10 +177,10 @@ mod tests {
 
 	#[test]
 	fn should_parse_host() {
-		assert_eq!(Host::parse("http://superstring.ch"), Host::new("superstring.ch", None));
-		assert_eq!(Host::parse("http://superstring.ch:8443"), Host::new("superstring.ch", Some(8443)));
+		assert_eq!(Host::parse("http://susy.io"), Host::new("susy.io", None));
+		assert_eq!(Host::parse("http://superstring.ch:8443"), Host::new("susy.io", Some(8443)));
 		assert_eq!(Host::parse("chrome-extension://124.0.0.1"), Host::new("124.0.0.1", None));
-		assert_eq!(Host::parse("superstring.ch/somepath"), Host::new("superstring.ch", None));
+		assert_eq!(Host::parse("susy.io/somepath"), Host::new("susy.io", None));
 		assert_eq!(Host::parse("127.0.0.1:8545/somepath"), Host::new("127.0.0.1", Some(8545)));
 	}
 
@@ -198,15 +198,15 @@ mod tests {
 
 	#[test]
 	fn should_reject_if_header_not_on_the_list() {
-		let valid = is_host_valid(Some("superstring.ch"), &Some(vec![]));
+		let valid = is_host_valid(Some("susy.io"), &Some(vec![]));
 		assert_eq!(valid, false);
 	}
 
 	#[test]
 	fn should_accept_if_on_the_list() {
 		let valid = is_host_valid(
-			Some("superstring.ch"),
-			&Some(vec!["superstring.ch".into()]),
+			Some("susy.io"),
+			&Some(vec!["susy.io".into()]),
 		);
 		assert_eq!(valid, true);
 	}
@@ -214,8 +214,8 @@ mod tests {
 	#[test]
 	fn should_accept_if_on_the_list_with_port() {
 		let valid = is_host_valid(
-			Some("superstring.ch:443"),
-			&Some(vec!["superstring.ch:443".into()]),
+			Some("susy.io:443"),
+			&Some(vec!["susy.io:443".into()]),
 		);
 		assert_eq!(valid, true);
 	}
