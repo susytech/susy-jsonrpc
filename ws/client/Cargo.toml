@@ -1,0 +1,31 @@
+[package]
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+description = "JSON-RPC 2.0 websocket client implementation."
+documentation = "https://docs.rs/susy-jsonrpc-ws-client/"
+edition = "2018"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+keywords = ["jsonrpc", "json-rpc", "json", "rpc", "serde"]
+license = "MIT"
+name = "susy-jsonrpc-ws-client"
+repository = "https://github.com/susytech/susy-jsonrpc"
+version = "11.0.0"
+
+categories = [
+	"asynchronous",
+	"network-programming",
+	"web-programming::http-client",
+	"web-programming::http-server",
+	"web-programming::websocket",
+]
+
+[dependencies]
+failure = "0.1"
+futures = "0.1"
+susy-jsonrpc-core = { version = "11.0", path = "../../core" }
+susy-jsonrpc-client = { version = "11.0", path = "../../client" }
+log = "0.4"
+tokio = "0.1"
+websocket = "0.22"
+
+[badges]
+travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

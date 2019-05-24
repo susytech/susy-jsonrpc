@@ -1,6 +1,6 @@
 use env_logger;
-use susy_jsonrpc_tcp_server::ServerBuilder;
 use susy_jsonrpc_tcp_server::susy_jsonrpc_core::*;
+use susy_jsonrpc_tcp_server::ServerBuilder;
 
 fn main() {
 	env_logger::init();
@@ -16,4 +16,3 @@ fn main() {
 
 	server.wait()
 }
-

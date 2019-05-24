@@ -7,20 +7,20 @@ homepage = "https://github.com/susytech/susy-jsonrpc"
 license = "MIT"
 name = "susy-jsonrpc-stdio-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.1.0"
+version = "11.0.0"
 
 [dependencies]
-futures = { version="0.1.23", registry="susytech" }
-susy-jsonrpc-core = { version = "10.1", registry="susytech" }
-log = { version="0.4", registry="susytech" }
-tokio = { version="0.1.7", registry="susytech" }
-tokio-codec = { version="0.1.0", registry="susytech" }
-tokio-io = { version="0.1.7", registry="susytech" }
-tokio-stdin-stdout = { version="0.1.4", registry="susytech" }
+futures = {version="0.1.23",registry="susytech"}
+susy-jsonrpc-core = { version = "11.0",registry="susytech"}
+log = {version="0.4",registry="susytech"}
+tokio = {version="0.1.7",registry="susytech"}
+tokio-codec = {version="0.1.0",registry="susytech"}
+tokio-io = {version="0.1.7",registry="susytech"}
+tokio-stdin-stdout = {version="0.1.4",registry="susytech"}
 
 [dev-dependencies]
-lazy_static = { version="1.0", registry="susytech" }
-env_logger = { version="0.6", registry="susytech" }
+lazy_static = {version="1.0",registry="susytech"}
+env_logger = {version="0.6",registry="susytech"}
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

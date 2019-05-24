@@ -10,7 +10,7 @@ Takes one request per line and outputs each response on a new line.
 
 ```
 [dependencies]
-susy-jsonrpc-stdio-server = "10.0"
+susy-jsonrpc-stdio-server = "11.0"
 ```
 
 `main.rs`

@@ -9,13 +9,15 @@ IPC server (Windows & Linux) for JSON-RPC 2.0.
 
 ```
 [dependencies]
-susy-jsonrpc-ipc-server = "10.0"
+susy-jsonrpc-ipc-server = "11.0"
 ```
 
 `main.rs`
 
 ```rust
-use susy_jsonrpc_ipc_server::Server;
+extern crate susy_jsonrpc_ipc_server;
+
+use susy_jsonrpc_ipc_server::ServerBuilder;
 use susy_jsonrpc_ipc_server::susy_jsonrpc_core::*;
 
 fn main() {
@@ -24,8 +26,9 @@ fn main() {
 		Ok(Value::String("hello".into()))
 	});
 
-	let server = Server::new("/tmp/json-ipc-test.ipc", io).unwrap();
-	::std::thread::spawn(move || server.run());
+	let builder = ServerBuilder::new(io);
+	let server = builder.start("/tmp/json-ipc-test.ipc").expect("Couldn't open socket");
+	server.wait();
 }
 ```
 

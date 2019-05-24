@@ -1,7 +1,9 @@
 extern crate serde;
 extern crate susy_jsonrpc_core;
+extern crate susy_jsonrpc_client;
 #[macro_use]
 extern crate susy_jsonrpc_derive;
+extern crate log;
 
 use susy_jsonrpc_core::{Result, IoHandler};
 
@@ -13,7 +15,7 @@ pub trait Rpc {
 
 	/// Adds two numbers and returns a result
 	#[rpc(name = "add", alias("callAsyncMetaAlias"))]
-	fn add(&self, _: u64, _: u64) -> Result<u64>;
+	fn add(&self, a: u64, b: u64) -> Result<u64>;
 }
 
 struct RpcImpl;

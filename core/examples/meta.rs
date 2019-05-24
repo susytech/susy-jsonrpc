@@ -1,5 +1,5 @@
-use susy_jsonrpc_core::*;
 use susy_jsonrpc_core::futures::Future;
+use susy_jsonrpc_core::*;
 
 #[derive(Clone, Default)]
 struct Meta(usize);

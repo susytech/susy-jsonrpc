@@ -1,10 +1,10 @@
 use std;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc};
+use std::sync::Arc;
 
-use crate::jsonrpc::futures::{Stream, Poll, Async, Sink, Future};
 use crate::jsonrpc::futures::sync::mpsc;
+use crate::jsonrpc::futures::{Async, Future, Poll, Sink, Stream};
 
 use parking_lot::Mutex;
 
@@ -17,14 +17,10 @@ pub struct PeerMessageQueue<S: Stream> {
 }
 
 impl<S: Stream> PeerMessageQueue<S> {
-	pub fn new(
-		response_stream: S,
-		receiver: mpsc::Receiver<String>,
-		addr: SocketAddr,
-	) -> Self {
+	pub fn new(response_stream: S, receiver: mpsc::Receiver<String>, addr: SocketAddr) -> Self {
 		PeerMessageQueue {
 			up: response_stream,
-			receiver: receiver,
+			receiver,
 			_addr: addr,
 		}
 	}
@@ -36,7 +32,7 @@ pub enum PushMessageError {
 	/// Invalid peer
 	NoSuchPeer,
 	/// Send error
-	Send(mpsc::SendError<String>)
+	Send(mpsc::SendError<String>),
 }
 
 impl From<mpsc::SendError<String>> for PushMessageError {
@@ -54,9 +50,7 @@ pub struct Dispatcher {
 impl Dispatcher {
 	/// Creates a new dispatcher
 	pub fn new(channels: Arc<SenderChannels>) -> Self {
-		Dispatcher {
-			channels: channels,
-		}
+		Dispatcher { channels }
 	}
 
 	/// Pushes message to given peer
@@ -66,12 +60,10 @@ impl Dispatcher {
 		match channels.get_mut(peer_addr) {
 			Some(channel) => {
 				// todo: maybe async here later?
-				channel.send(msg).wait().map_err(|e| PushMessageError::from(e))?;
+				channel.send(msg).wait().map_err(PushMessageError::from)?;
 				Ok(())
-			},
-			None => {
-				return Err(PushMessageError::NoSuchPeer);
 			}
+			None => Err(PushMessageError::NoSuchPeer),
 		}
 	}
 
@@ -86,8 +78,7 @@ impl Dispatcher {
 	}
 }
 
-impl<S: Stream<Item=String, Error=std::io::Error>> Stream for PeerMessageQueue<S> {
-
+impl<S: Stream<Item = String, Error = std::io::Error>> Stream for PeerMessageQueue<S> {
 	type Item = String;
 	type Error = std::io::Error;
 
@@ -96,11 +87,11 @@ impl<S: Stream<Item=String, Error=std::io::Error>> Stream for PeerMessageQueue<S
 		match self.up.poll() {
 			Ok(Async::Ready(Some(val))) => {
 				return Ok(Async::Ready(Some(val)));
-			},
+			}
 			Ok(Async::Ready(None)) => {
 				// this will ensure that this polling will end when incoming i/o stream ends
 				return Ok(Async::Ready(None));
-			},
+			}
 			_ => {}
 		}
 

@@ -3,6 +3,8 @@
 Rust implementation of JSON-RPC 2.0 Specification.
 Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` and `tcp`.
 
+**New!** Support for [clients](#Client-support).
+
 [![Build Status][travis-image]][travis-url]
 [![Build Status][appveyor-image]][appveyor-url]
 
@@ -20,7 +22,6 @@ Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` 
 - [susy-jsonrpc-tcp-server](./tcp) [![crates.io][tcp-server-image]][tcp-server-url]
 - [susy-jsonrpc-ws-server](./ws) [![crates.io][ws-server-image]][ws-server-url]
 - [susy-jsonrpc-stdio-server](./stdio) [![crates.io][stdio-server-image]][stdio-server-url]
-- [susy-jsonrpc-macros](./macros) [![crates.io][macros-image]][macros-url] *deprecated:* use `derive` instead
 - [susy-jsonrpc-derive](./derive) [![crates.io][derive-image]][derive-url]
 - [susy-jsonrpc-server-utils](./server-utils) [![crates.io][server-utils-image]][server-utils-url]
 - [susy-jsonrpc-pubsub](./pubsub) [![crates.io][pubsub-image]][pubsub-url]
@@ -37,8 +38,6 @@ Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` 
 [ws-server-url]: https://crates.io/crates/susy-jsonrpc-ws-server
 [stdio-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-stdio-server.svg
 [stdio-server-url]: https://crates.io/crates/susy-jsonrpc-stdio-server
-[macros-image]: https://img.shields.io/crates/v/susy-jsonrpc-macros.svg
-[macros-url]: https://crates.io/crates/susy-jsonrpc-macros
 [derive-image]: https://img.shields.io/crates/v/susy-jsonrpc-derive.svg
 [derive-url]: https://crates.io/crates/susy-jsonrpc-derive
 [server-utils-image]: https://img.shields.io/crates/v/susy-jsonrpc-server-utils.svg
@@ -50,7 +49,6 @@ Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` 
 
 - [core](./core/examples)
 - [derive](./derive/examples)
-- [macros](./macros/examples) *deprecated*
 - [pubsub](./pubsub/examples)
 
 ### Basic Usage (with HTTP transport)
@@ -98,3 +96,57 @@ fn main() {
 	let mut io = susy_jsonrpc_core::IoHandler::new();
 	io.extend_with(RpcImpl.to_delegate())
 }
+```
+
+### Client support
+
+```rust
+use susy_jsonrpc_client::local;
+use susy_jsonrpc_core::futures::future::{self, Future, FutureResult};
+use susy_jsonrpc_core::{Error, IoHandler, Result};
+use susy_jsonrpc_derive::rpc;
+
+/// Rpc trait
+#[rpc]
+pub trait Rpc {
+	/// Returns a protocol version
+	#[rpc(name = "protocolVersion")]
+	fn protocol_version(&self) -> Result<String>;
+
+	/// Adds two numbers and returns a result
+	#[rpc(name = "add", alias("callAsyncMetaAlias"))]
+	fn add(&self, a: u64, b: u64) -> Result<u64>;
+
+	/// Performs asynchronous operation
+	#[rpc(name = "callAsync")]
+	fn call(&self, a: u64) -> FutureResult<String, Error>;
+}
+
+struct RpcImpl;
+
+impl Rpc for RpcImpl {
+	fn protocol_version(&self) -> Result<String> {
+		Ok("version1".into())
+	}
+
+	fn add(&self, a: u64, b: u64) -> Result<u64> {
+		Ok(a + b)
+	}
+
+	fn call(&self, _: u64) -> FutureResult<String, Error> {
+		future::ok("OK".to_owned())
+	}
+}
+
+fn main() {
+	let mut io = IoHandler::new();
+	io.extend_with(RpcImpl.to_delegate());
+
+	let fut = {
+		let (client, server) = local::connect::<gen_client::Client, _, _>(io);
+		client.add(5, 6).map(|res| println!("5 + 6 = {}", res)).join(server)
+	};
+	fut.wait().unwrap();
+}
+
+```

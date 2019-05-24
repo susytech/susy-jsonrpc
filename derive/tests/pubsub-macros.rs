@@ -1,13 +1,13 @@
-use serde_json;
 use susy_jsonrpc_core;
 use susy_jsonrpc_pubsub;
+use serde_json;
 #[macro_use]
 extern crate susy_jsonrpc_derive;
 
-use std::sync::Arc;
 use susy_jsonrpc_core::futures::sync::mpsc;
-use susy_jsonrpc_pubsub::{PubSubHandler, SubscriptionId, Session, PubSubMetadata};
 use susy_jsonrpc_pubsub::typed::Subscriber;
+use susy_jsonrpc_pubsub::{PubSubHandler, PubSubMetadata, Session, SubscriptionId};
+use std::sync::Arc;
 
 pub enum MyError {}
 impl From<MyError> for susy_jsonrpc_core::Error {
@@ -24,15 +24,15 @@ pub trait Rpc {
 
 	/// Hello subscription
 	#[pubsub(subscription = "hello", subscribe, name = "hello_subscribe", alias("hello_alias"))]
-	fn subscribe(&self, _: Self::Metadata, _: Subscriber<String>, _: u32, _: Option<u64>);
+	fn subscribe(&self, a: Self::Metadata, b: Subscriber<String>, c: u32, d: Option<u64>);
 
 	/// Unsubscribe from hello subscription.
 	#[pubsub(subscription = "hello", unsubscribe, name = "hello_unsubscribe")]
-	fn unsubscribe(&self, _: Option<Self::Metadata>, _: SubscriptionId) -> Result<bool>;
+	fn unsubscribe(&self, a: Option<Self::Metadata>, b: SubscriptionId) -> Result<bool>;
 
 	/// A regular rpc method alongside pubsub
 	#[rpc(name = "add")]
-	fn add(&self, _: u64, _: u64) -> Result<u64>;
+	fn add(&self, a: u64, b: u64) -> Result<u64>;
 }
 
 #[derive(Default)]
@@ -108,4 +108,3 @@ fn test_subscribe_with_alias() {
 	let result: susy_jsonrpc_core::Response = serde_json::from_str(&res.unwrap()).unwrap();
 	assert_eq!(expected, result);
 }
-

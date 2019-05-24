@@ -1,5 +1,5 @@
-use susy_jsonrpc_ws_server::ServerBuilder;
 use susy_jsonrpc_ws_server::susy_jsonrpc_core::*;
+use susy_jsonrpc_ws_server::ServerBuilder;
 
 fn main() {
 	let mut io = IoHandler::default();

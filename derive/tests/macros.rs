@@ -1,6 +1,6 @@
-use serde_json;
-use susy_jsonrpc_derive::rpc;
 use susy_jsonrpc_core::{IoHandler, Response};
+use susy_jsonrpc_derive::rpc;
+use serde_json;
 
 pub enum MyError {}
 impl From<MyError> for susy_jsonrpc_core::Error {
@@ -19,11 +19,11 @@ pub trait Rpc {
 
 	/// Negates number and returns a result
 	#[rpc(name = "neg")]
-	fn neg(&self, _: i64) -> Result<i64>;
+	fn neg(&self, a: i64) -> Result<i64>;
 
 	/// Adds two numbers and returns a result
 	#[rpc(name = "add", alias("add_alias1", "add_alias2"))]
-	fn add(&self, _: u64, _: u64) -> Result<u64>;
+	fn add(&self, a: u64, b: u64) -> Result<u64>;
 }
 
 #[derive(Default)]
@@ -88,11 +88,17 @@ fn should_accept_single_param() {
 
 	// then
 	let result1: Response = serde_json::from_str(&res1.unwrap()).unwrap();
-	assert_eq!(result1, serde_json::from_str(r#"{
+	assert_eq!(
+		result1,
+		serde_json::from_str(
+			r#"{
 		"jsonrpc": "2.0",
 		"result": -1,
 		"id": 1
-	}"#).unwrap());
+	}"#
+		)
+		.unwrap()
+	);
 }
 
 #[test]
@@ -108,11 +114,17 @@ fn should_accept_multiple_params() {
 
 	// then
 	let result1: Response = serde_json::from_str(&res1.unwrap()).unwrap();
-	assert_eq!(result1, serde_json::from_str(r#"{
+	assert_eq!(
+		result1,
+		serde_json::from_str(
+			r#"{
 		"jsonrpc": "2.0",
 		"result": 3,
 		"id": 1
-	}"#).unwrap());
+	}"#
+		)
+		.unwrap()
+	);
 }
 
 #[test]
@@ -130,17 +142,28 @@ fn should_use_method_name_aliases() {
 
 	// then
 	let result1: Response = serde_json::from_str(&res1.unwrap()).unwrap();
-	assert_eq!(result1, serde_json::from_str(r#"{
+	assert_eq!(
+		result1,
+		serde_json::from_str(
+			r#"{
 		"jsonrpc": "2.0",
 		"result": 3,
 		"id": 1
-	}"#).unwrap());
+	}"#
+		)
+		.unwrap()
+	);
 
 	let result2: Response = serde_json::from_str(&res2.unwrap()).unwrap();
-	assert_eq!(result2, serde_json::from_str(r#"{
+	assert_eq!(
+		result2,
+		serde_json::from_str(
+			r#"{
 		"jsonrpc": "2.0",
 		"result": 3,
 		"id": 1
-	}"#).unwrap());
+	}"#
+		)
+		.unwrap()
+	);
 }
-

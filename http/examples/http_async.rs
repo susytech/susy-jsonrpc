@@ -1,5 +1,5 @@
-use susy_jsonrpc_http_server::{ServerBuilder, DomainsValidation, AccessControlAllowOrigin};
 use susy_jsonrpc_http_server::susy_jsonrpc_core::*;
+use susy_jsonrpc_http_server::{AccessControlAllowOrigin, DomainsValidation, ServerBuilder};
 
 fn main() {
 	let mut io = IoHandler::default();
@@ -14,4 +14,3 @@ fn main() {
 
 	server.wait();
 }
-

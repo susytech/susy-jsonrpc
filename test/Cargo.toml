@@ -1,7 +1,7 @@
 [package]
 name = "susy-jsonrpc-test"
 description = "Simple test framework for JSON-RPC."
-version = "10.1.0"
+version = "11.0.0"
 authors = ["Tomasz Drwięga <tomasz@superstring.ch>"]
 license = "MIT"
 homepage = "https://github.com/susytech/susy-jsonrpc"
@@ -10,11 +10,13 @@ documentation = "https://docs.rs/susy-jsonrpc-test/"
 edition = "2018"
 
 [dependencies]
-susy-jsonrpc-core = { version = "10.0", registry="susytech" }
-susy-jsonrpc-pubsub = { version = "10.0", registry="susytech" }
-serde = { version="1.0", registry="susytech" }
-serde_json = { version="1.0", registry="susytech" }
+susy-jsonrpc-core = { version = "11.0", registry="susytech" }
+susy-jsonrpc-client = { version = "11.0", registry="susytech" }
+susy-jsonrpc-pubsub = { version = "11.0", registry="susytech" }
+log = { version = "0.4", registry="susytech" }
+serde = { version = "1.0", registry="susytech" }
+serde_json = { version = "1.0", registry="susytech" }
 
 [dev-dependencies]
-susy-jsonrpc-derive = { version = "10.0", registry="susytech" }
+susy-jsonrpc-derive = { version = "11.0", registry="susytech" }
 

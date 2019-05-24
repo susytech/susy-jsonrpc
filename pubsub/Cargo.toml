@@ -8,16 +8,16 @@ keywords = ["jsonrpc", "json-rpc", "json", "rpc", "macros"]
 license = "MIT"
 name = "susy-jsonrpc-pubsub"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.1.0"
+version = "11.0.0"
 
 [dependencies]
-log = { version="0.4",registry="susytech"}
-parking_lot = { version="0.7",registry="susytech" }
-susy-jsonrpc-core = { version = "10.1", registry="susytech" }
-serde = { version="1.0", registry="susytech" }
+log = {version="0.4", registry="susytech"}
+parking_lot = {version="0.7", registry="susytech"}
+susy-jsonrpc-core = { version = "11.0", registry="susytech"}
+serde = {version="1.0", registry="susytech"}
 
 [dev-dependencies]
-susy-jsonrpc-tcp-server = { version = "10.1", registry="susytech" }
+susy-jsonrpc-tcp-server = { version = "11.0", registry="susytech"}
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

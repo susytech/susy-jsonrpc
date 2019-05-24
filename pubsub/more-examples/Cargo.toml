@@ -3,12 +3,12 @@ name = "susy-jsonrpc-pubsub-examples"
 description = "Examples of Publish-Subscribe extension for jsonrpc."
 homepage = "https://github.com/susytech/susy-jsonrpc"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.1.0"
+version = "11.0.0"
 authors = ["tomusdrw <tomasz@superstring.ch>"]
 license = "MIT"
 
 [dependencies]
-susy-jsonrpc-core = { version = "10.1", path = "../../core" }
-susy-jsonrpc-pubsub = { version = "10.1", path = "../" }
-susy-jsonrpc-ws-server = { version = "10.1", path = "../../ws" }
-susy-jsonrpc-ipc-server = { version = "10.1", path = "../../ipc" }
+susy-jsonrpc-core = { version = "11.0", path = "../../core" }
+susy-jsonrpc-pubsub = { version = "11.0", path = "../" }
+susy-jsonrpc-ws-server = { version = "11.0", path = "../../ws" }
+susy-jsonrpc-ipc-server = { version = "11.0", path = "../../ipc" }

@@ -1,8 +1,6 @@
-use susy_jsonrpc_http_server::{
-	hyper, ServerBuilder, DomainsValidation, AccessControlAllowOrigin, Response, RestApi
-};
-use susy_jsonrpc_http_server::susy_jsonrpc_core::{IoHandler, Value};
 use susy_jsonrpc_http_server::susy_jsonrpc_core::futures;
+use susy_jsonrpc_http_server::susy_jsonrpc_core::{IoHandler, Value};
+use susy_jsonrpc_http_server::{hyper, AccessControlAllowOrigin, DomainsValidation, Response, RestApi, ServerBuilder};
 
 fn main() {
 	let mut io = IoHandler::default();
@@ -25,4 +23,3 @@ fn main() {
 
 	server.wait();
 }
-

@@ -7,16 +7,15 @@ homepage = "https://github.com/susytech/susy-jsonrpc"
 license = "MIT"
 name = "susy-jsonrpc-ws-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.1.0"
+version = "11.0.0"
 
 [dependencies]
-error-chain = { version = "0.12", registry="susytech" }
-susy-jsonrpc-core = { version = "10.1", registry="susytech" }
-susy-jsonrpc-server-utils = { version = "10.1", registry="susytech" }
-log = { version = "0.4", registry="susytech" }
-parking_lot = { version = "0.7", registry="susytech" }
-slab = { version = "0.4", registry="susytech" }
-susy-ws = { version = "0.8", registry="susytech" }
+susy-jsonrpc-core = { version = "11.0", registry="susytech" }
+susy-jsonrpc-server-utils = { version = "11.0", registry="susytech" }
+log = { version ="0.4",registry="susytech" }
+parking_lot = { version ="0.7",registry="susytech" }
+slab = { version ="0.4",registry="susytech" }
+ws = { version ="0.8",registry="susytech" }
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

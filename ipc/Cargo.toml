@@ -7,19 +7,19 @@ homepage = "https://github.com/susytech/susy-jsonrpc"
 license = "MIT"
 name = "susy-jsonrpc-ipc-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.1.0"
+version = "11.0.0"
 
 [dependencies]
-log = {version="0.4", registry="susytech"}
-tokio-service = {version="0.1", registry="susytech"}
-susy-jsonrpc-core = { version = "10.1", registry="susytech"}
-susy-jsonrpc-server-utils = { version = "10.1", registry="susytech"}
-susy-tokio-ipc = {version="0.1", registry="susytech"}
-parking_lot = {version="0.7", registry="susytech"}
+log = {version="0.4",registry="susytech"}
+tokio-service = {version="0.1",registry="susytech"}
+susy-jsonrpc-core = { version = "11.0",registry="susytech"}
+susy-jsonrpc-server-utils = { version = "11.0",registry="susytech"}
+susy-tokio-ipc = {version="0.1",registry="susytech"}
+parking_lot = {version="0.7",registry="susytech"}
 
 [dev-dependencies]
-env_logger = {version="0.6", registry="susytech"}
-lazy_static = {version="1.0", registry="susytech"}
+env_logger = {version="0.6",registry="susytech"}
+lazy_static = {version="1.0",registry="susytech"}
 
 [target.'cfg(not(windows))'.dev-dependencies]
 tokio-uds = "0.2"

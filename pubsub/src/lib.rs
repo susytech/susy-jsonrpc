@@ -9,11 +9,12 @@ extern crate log;
 
 mod delegates;
 mod handler;
+pub mod oneshot;
 mod subscription;
-mod types;
 pub mod typed;
+mod types;
 
-pub use self::handler::{PubSubHandler, SubscribeRpcMethod, UnsubscribeRpcMethod};
 pub use self::delegates::IoDelegate;
-pub use self::subscription::{Session, Sink, Subscriber, new_subscription};
-pub use self::types::{PubSubMetadata, SubscriptionId, TransportError, SinkResult};
+pub use self::handler::{PubSubHandler, SubscribeRpcMethod, UnsubscribeRpcMethod};
+pub use self::subscription::{new_subscription, Session, Sink, Subscriber};
+pub use self::types::{PubSubMetadata, SinkResult, SubscriptionId, TransportError};
