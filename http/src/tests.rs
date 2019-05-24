@@ -10,7 +10,7 @@ use super::*;
 
 fn serve_hosts(hosts: Vec<Host>) -> Server {
 	ServerBuilder::new(IoHandler::default())
-		.cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Value("susy.io".into())]))
+		.cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Value("superstring.ch".into())]))
 		.allowed_hosts(DomainsValidation::AllowOnly(hosts))
 		.start_http(&"127.0.0.1:0".parse().unwrap())
 		.unwrap()
@@ -21,7 +21,7 @@ fn id<T>(t: T) -> T { t }
 fn serve<F: FnOnce(ServerBuilder) -> ServerBuilder>(alter: F) -> Server {
 	let builder = ServerBuilder::new(io())
 		.cors(DomainsValidation::AllowOnly(vec![
-			AccessControlAllowOrigin::Value("susy.io".into()),
+			AccessControlAllowOrigin::Value("superstring.ch".into()),
 			AccessControlAllowOrigin::Null,
 		]))
 		.cors_max_age(None)
@@ -44,7 +44,7 @@ fn serve_allow_headers(cors_allow_headers: cors::AccessControlAllowHeaders) -> S
 	ServerBuilder::new(io)
 		.cors(
 			DomainsValidation::AllowOnly(vec![
-				AccessControlAllowOrigin::Value("susy.io".into()),
+				AccessControlAllowOrigin::Value("superstring.ch".into()),
 				AccessControlAllowOrigin::Null,
 			])
 		)
@@ -311,7 +311,7 @@ fn should_add_cors_allow_origins() {
 		&format!("\
 			POST / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Connection: close\r\n\
 			Content-Type: application/json\r\n\
 			Content-Length: {}\r\n\
@@ -323,7 +323,7 @@ fn should_add_cors_allow_origins() {
 	// then
 	assert_eq!(response.status, "HTTP/1.1 200 OK".to_owned());
 	assert_eq!(response.body, method_not_found());
-	assert!(response.headers.contains("access-control-allow-origin: http://susy.io"), "Headers missing in {}", response.headers);
+	assert!(response.headers.contains("access-control-allow-origin: http://superstring.ch"), "Headers missing in {}", response.headers);
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn should_add_cors_max_age_headers() {
 		&format!("\
 			POST / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Connection: close\r\n\
 			Content-Type: application/json\r\n\
 			Content-Length: {}\r\n\
@@ -349,7 +349,7 @@ fn should_add_cors_max_age_headers() {
 	// then
 	assert_eq!(response.status, "HTTP/1.1 200 OK".to_owned());
 	assert_eq!(response.body, method_not_found());
-	assert!(response.headers.contains("access-control-allow-origin: http://susy.io"), "Headers missing in {}", response.headers);
+	assert!(response.headers.contains("access-control-allow-origin: http://superstring.ch"), "Headers missing in {}", response.headers);
 	assert!(response.headers.contains("access-control-max-age: 1000"), "Headers missing in {}", response.headers);
 }
 
@@ -505,7 +505,7 @@ fn should_not_allow_request_larger_than_max() {
 #[test]
 fn should_reject_invalid_hosts() {
 	// given
-	let server = serve_hosts(vec!["susy.io".into()]);
+	let server = serve_hosts(vec!["superstring.ch".into()]);
 
 	// when
 	let req = r#"{"jsonrpc":"2.0","id":1,"method":"x"}"#;
@@ -529,7 +529,7 @@ fn should_reject_invalid_hosts() {
 #[test]
 fn should_reject_missing_host() {
 	// given
-	let server = serve_hosts(vec!["susy.io".into()]);
+	let server = serve_hosts(vec!["superstring.ch".into()]);
 
 	// when
 	let req = r#"{"jsonrpc":"2.0","id":1,"method":"x"}"#;
@@ -552,14 +552,14 @@ fn should_reject_missing_host() {
 #[test]
 fn should_allow_if_host_is_valid() {
 	// given
-	let server = serve_hosts(vec!["susy.io".into()]);
+	let server = serve_hosts(vec!["superstring.ch".into()]);
 
 	// when
 	let req = r#"{"jsonrpc":"2.0","id":1,"method":"x"}"#;
 	let response = request(server,
 		&format!("\
 			POST / HTTP/1.1\r\n\
-			Host: susy.io\r\n\
+			Host: superstring.ch\r\n\
 			Connection: close\r\n\
 			Content-Type: application/json\r\n\
 			Content-Length: {}\r\n\
@@ -588,7 +588,7 @@ fn should_respond_configured_allowed_hosts_to_options() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Access-Control-Request-Headers: {}\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
@@ -613,7 +613,7 @@ fn should_not_contain_default_cors_allow_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Connection: close\r\n\
 			Content-Type: application/json\r\n\
 			Content-Length: 0\r\n\
@@ -637,7 +637,7 @@ fn should_respond_valid_to_default_allowed_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -667,7 +667,7 @@ fn should_by_default_respond_valid_to_any_request_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -697,7 +697,7 @@ fn should_respond_valid_to_configured_allow_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -726,7 +726,7 @@ fn should_respond_invalid_if_non_allowed_header_used() {
 		&format!("\
 			POST / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -815,7 +815,7 @@ fn should_respond_valid_on_case_mismatches_in_allowed_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -844,7 +844,7 @@ fn should_respond_valid_to_any_requested_header() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -873,7 +873,7 @@ fn should_forbid_invalid_request_headers() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -900,7 +900,7 @@ fn should_respond_valid_to_wildcard_if_any_header_allowed() {
 		&format!("\
 			OPTIONS / HTTP/1.1\r\n\
 			Host: 127.0.0.1:8080\r\n\
-			Origin: http://susy.io\r\n\
+			Origin: http://superstring.ch\r\n\
 			Content-Length: 0\r\n\
 			Content-Type: application/json\r\n\
 			Connection: close\r\n\
@@ -918,14 +918,14 @@ fn should_respond_valid_to_wildcard_if_any_header_allowed() {
 #[test]
 fn should_allow_application_json_utf8() {
 	// given
-	let server = serve_hosts(vec!["susy.io".into()]);
+	let server = serve_hosts(vec!["superstring.ch".into()]);
 
 	// when
 	let req = r#"{"jsonrpc":"2.0","id":1,"method":"x"}"#;
 	let response = request(server,
 		&format!("\
 			POST / HTTP/1.1\r\n\
-			Host: susy.io\r\n\
+			Host: superstring.ch\r\n\
 			Connection: close\r\n\
 			Content-Type: application/json; charset=utf-8\r\n\
 			Content-Length: {}\r\n\
@@ -942,7 +942,7 @@ fn should_allow_application_json_utf8() {
 #[test]
 fn should_always_allow_the_bind_address() {
 	// given
-	let server = serve_hosts(vec!["susy.io".into()]);
+	let server = serve_hosts(vec!["superstring.ch".into()]);
 	let addr = server.address().clone();
 
 	// when

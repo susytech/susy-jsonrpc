@@ -1,5 +1,5 @@
 [package]
-authors = ["Susy Technologies <admin@susy.io>"]
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
 description = "Rust http server using JSONRPC 2.0."
 documentation = "https://docs.rs/susy-jsonrpc-http-server/"
 edition = "2018"
@@ -8,15 +8,15 @@ keywords = ["jsonrpc", "json-rpc", "json", "rpc", "server"]
 license = "MIT"
 name = "susy-jsonrpc-http-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.0.1"
+version = "10.1.0"
 
 [dependencies]
-hyper = "0.12"
-susy-jsonrpc-core = { version = "10.0", path = "../core" }
-susy-jsonrpc-server-utils = { version = "10.0", path = "../server-utils" }
-log = "0.4"
-net2 = "0.2"
-unicase = "2.0"
+hyper = {version="0.12",registry="susytech"}
+susy-jsonrpc-core = { version = "10.1",registry="susytech"}
+susy-jsonrpc-server-utils = { version = "10.1",registry="susytech"}
+log = { version="0.4",registry="susytech"}
+net2 = { version="0.2",registry="susytech"}
+unicase = { version="2.0",registry="susytech"}
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

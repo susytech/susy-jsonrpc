@@ -1,5 +1,5 @@
 [package]
-authors = ["Susy Technologies <admin@susy.io>"]
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
 description = "STDIN/STDOUT server for JSON-RPC"
 documentation = "https://docs.rs/susy-jsonrpc-stdio-server/"
 edition = "2018"
@@ -7,20 +7,20 @@ homepage = "https://github.com/susytech/susy-jsonrpc"
 license = "MIT"
 name = "susy-jsonrpc-stdio-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-version = "10.0.1"
+version = "10.1.0"
 
 [dependencies]
-futures = "0.1.23"
-susy-jsonrpc-core = { version = "10.0", path = "../core" }
-log = "0.4"
-tokio = "0.1.7"
-tokio-codec = "0.1.0"
-tokio-io = "0.1.7"
-tokio-stdin-stdout = "0.1.4"
+futures = { version="0.1.23", registry="susytech" }
+susy-jsonrpc-core = { version = "10.1", registry="susytech" }
+log = { version="0.4", registry="susytech" }
+tokio = { version="0.1.7", registry="susytech" }
+tokio-codec = { version="0.1.0", registry="susytech" }
+tokio-io = { version="0.1.7", registry="susytech" }
+tokio-stdin-stdout = { version="0.1.4", registry="susytech" }
 
 [dev-dependencies]
-lazy_static = "1.0"
-env_logger = "0.6"
+lazy_static = { version="1.0", registry="susytech" }
+env_logger = { version="0.6", registry="susytech" }
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}
