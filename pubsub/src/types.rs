@@ -1,8 +1,8 @@
 use std::sync::Arc;
-use core;
-use core::futures::sync::mpsc;
+use crate::core;
+use crate::core::futures::sync::mpsc;
 
-use subscription::Session;
+use crate::subscription::Session;
 
 /// Raw transport sink for specific client.
 pub type TransportSender = mpsc::Sender<String>;
@@ -12,10 +12,26 @@ pub type TransportError = mpsc::SendError<String>;
 pub type SinkResult = core::futures::sink::Send<TransportSender>;
 
 /// Metadata extension for pub-sub method handling.
+///
+/// NOTE storing `PubSubMetadata` (or rather storing `Arc<Session>`) in
+/// any other place outside of the handler will prevent `unsubscribe` methods
+/// to be called in case the `Session` is dropped (i.e. transport connection is closed).
 pub trait PubSubMetadata: core::Metadata {
 	/// Returns session object associated with given request/client.
 	/// `None` indicates that sessions are not supported on the used transport.
 	fn session(&self) -> Option<Arc<Session>>;
+}
+
+impl PubSubMetadata for Arc<Session> {
+	fn session(&self) -> Option<Arc<Session>> {
+		Some(self.clone())
+	}
+}
+
+impl<T: PubSubMetadata> PubSubMetadata for Option<T> {
+	fn session(&self) -> Option<Arc<Session>> {
+		self.as_ref().and_then(|s| s.session())
+	}
 }
 
 /// Unique subscription id.
@@ -62,7 +78,7 @@ impl From<SubscriptionId> for core::Value {
 
 #[cfg(test)]
 mod tests {
-	use core::Value;
+	use crate::core::Value;
 	use super::SubscriptionId;
 
 	#[test]

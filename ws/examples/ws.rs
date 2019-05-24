@@ -1,8 +1,5 @@
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_ws_server;
-
-use susy_jsonrpc_core::*;
 use susy_jsonrpc_ws_server::ServerBuilder;
+use susy_jsonrpc_ws_server::susy_jsonrpc_core::*;
 
 fn main() {
 	let mut io = IoHandler::default();

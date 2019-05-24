@@ -1,10 +1,9 @@
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_tcp_server;
-
-use susy_jsonrpc_core::*;
+use env_logger;
 use susy_jsonrpc_tcp_server::ServerBuilder;
+use susy_jsonrpc_tcp_server::susy_jsonrpc_core::*;
 
 fn main() {
+	env_logger::init();
 	let mut io = IoHandler::default();
 	io.add_method("say_hello", |_params| {
 		println!("Processing");

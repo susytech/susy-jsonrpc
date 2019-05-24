@@ -1,21 +1,22 @@
 [package]
-name = "susy-jsonrpc-ws-server"
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
 description = "WebSockets server for JSON-RPC"
-version = "8.0.0"
-authors = ["tomusdrw <tomasz@superstring.ch>"]
-license = "MIT"
+documentation = "https://docs.rs/susy-jsonrpc-ws-server/"
+edition = "2018"
 homepage = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-ws-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-documentation = "https://susytech.github.io/jsonrpc/json_ws_server/index.html"
+version = "10.0.1"
 
 [dependencies]
-error-chain = {version="0.11",registry="susytech"}
-susy-jsonrpc-core = { version = "8.0", registry="susytech" }
-susy-jsonrpc-server-utils = { version = "8.0", registry="susytech" }
-log = { version="0.3", registry="susytech"}
-parking_lot = { version="0.4", registry="susytech" }
-slab = { version="0.3", registry="susytech" }
-ws = { version="0.7.5", registry="susytech" }
+error-chain = { version = "0.12", registry="susytech"}
+susy-jsonrpc-core = { version = "10.0", registry="susytech"}
+susy-jsonrpc-server-utils = { version = "10.0", registry="susytech"}
+log = { version = "0.4", registry="susytech"}
+parking_lot = { version = "0.7", registry="susytech"}
+slab = { version = "0.4", registry="susytech"}
+susy-ws = { version = "0.8", registry="susytech"}
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

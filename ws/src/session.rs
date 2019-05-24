@@ -1,22 +1,22 @@
 use std;
 use std::sync::{atomic, Arc};
 
-use core;
-use core::futures::{Async, Future, Poll};
-use core::futures::sync::oneshot;
+use crate::core;
+use crate::core::futures::{Async, Future, Poll};
+use crate::core::futures::sync::oneshot;
 
 use parking_lot::Mutex;
 use slab::Slab;
 
-use server_utils::Pattern;
-use server_utils::cors::Origin;
-use server_utils::hosts::Host;
-use server_utils::tokio_core::reactor::Remote;
-use server_utils::session::{SessionId, SessionStats};
-use ws;
+use crate::server_utils::Pattern;
+use crate::server_utils::cors::Origin;
+use crate::server_utils::hosts::Host;
+use crate::server_utils::session::{SessionId, SessionStats};
+use crate::server_utils::tokio::runtime::TaskExecutor;
+use crate::ws;
 
-use error;
-use metadata;
+use crate::error;
+use crate::metadata;
 
 /// Middleware to intsrcept server requests.
 /// You can either terminate the request (by returning a response)
@@ -97,7 +97,7 @@ impl LivenessPoll {
 
 		let (index, rx) = {
 			let mut task_slab = task_slab.lock();
-			if !task_slab.has_available() {
+			if task_slab.len() == task_slab.capacity() {
 				// grow the size if necessary.
 				// we don't expect this to get so big as to overflow.
 				let reserve = ::std::cmp::max(task_slab.capacity(), INITIAL_SIZE);
@@ -105,7 +105,7 @@ impl LivenessPoll {
 			}
 
 			let (tx, rx) = oneshot::channel();
-			let index = task_slab.insert(Some(tx)).expect("just checked slab capacity or grew; qed");
+			let index = task_slab.insert(Some(tx));
 			(index, rx)
 		};
 
@@ -144,8 +144,8 @@ pub struct Session<M: core::Metadata, S: core::Middleware<M>> {
 	allowed_hosts: Option<Vec<Host>>,
 	request_middleware: Option<Arc<RequestMiddleware>>,
 	stats: Option<Arc<SessionStats>>,
-	metadata: M,
-	remote: Remote,
+	metadata: Option<M>,
+	executor: TaskExecutor,
 	task_slab: Arc<TaskSlab>,
 }
 
@@ -155,7 +155,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> Drop for Session<M, S> {
 		self.stats.as_ref().map(|stats| stats.close_session(self.context.session_id));
 
 		// signal to all still-live tasks that the session has been dropped.
-		for task in self.task_slab.lock().iter_mut() {
+		for (_index, task) in self.task_slab.lock().iter_mut() {
 			if let Some(task) = task.take() {
 				let _ = task.send(());
 			}
@@ -222,7 +222,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> ws::Handler for Session<M, S> {
 		self.context.protocols = req.protocols().ok()
 			.map(|protos| protos.into_iter().map(Into::into).collect())
 			.unwrap_or_else(Vec::new);
-		self.metadata = self.meta_extractor.extract(&self.context);
+		self.metadata = Some(self.meta_extractor.extract(&self.context));
 
 		match action {
 			MiddlewareAction::Proceed => ws::Response::from_request(req).map(|mut res| {
@@ -238,7 +238,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> ws::Handler for Session<M, S> {
 	fn on_message(&mut self, msg: ws::Message) -> ws::Result<()> {
 		let req = msg.as_text()?;
 		let out = self.context.out.clone();
-		let metadata = self.metadata.clone();
+		let metadata = self.metadata.clone().expect("Metadata is always set in on_request; qed");
 
 		// TODO: creation requires allocating a `oneshot` channel and acquiring a
 		// mutex. we could alternatively do this lazily upon first poll if
@@ -268,7 +268,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> ws::Handler for Session<M, S> {
 			.map(|_| ())
 			.map_err(|_| ());
 
-		self.remote.spawn(|_| future);
+		self.executor.spawn(future);
 
 		Ok(())
 	}
@@ -282,7 +282,7 @@ pub struct Factory<M: core::Metadata, S: core::Middleware<M>> {
 	allowed_hosts: Option<Vec<Host>>,
 	request_middleware: Option<Arc<RequestMiddleware>>,
 	stats: Option<Arc<SessionStats>>,
-	remote: Remote,
+	executor: TaskExecutor,
 }
 
 impl<M: core::Metadata, S: core::Middleware<M>> Factory<M, S> {
@@ -293,7 +293,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> Factory<M, S> {
 		allowed_hosts: Option<Vec<Host>>,
 		request_middleware: Option<Arc<RequestMiddleware>>,
 		stats: Option<Arc<SessionStats>>,
-		remote: Remote,
+		executor: TaskExecutor,
 	) -> Self {
 		Factory {
 			session_id: 0,
@@ -303,7 +303,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> Factory<M, S> {
 			allowed_hosts: allowed_hosts,
 			request_middleware: request_middleware,
 			stats: stats,
-			remote: remote,
+			executor: executor,
 		}
 	}
 }
@@ -323,7 +323,7 @@ impl<M: core::Metadata, S: core::Middleware<M>> ws::Factory for Factory<M, S> {
 				origin: None,
 				protocols: Vec::new(),
 				out: metadata::Sender::new(sender, active),
-				remote: self.remote.clone(),
+				executor: self.executor.clone(),
 			},
 			handler: self.handler.clone(),
 			meta_extractor: self.meta_extractor.clone(),
@@ -331,8 +331,8 @@ impl<M: core::Metadata, S: core::Middleware<M>> ws::Factory for Factory<M, S> {
 			allowed_hosts: self.allowed_hosts.clone(),
 			stats: self.stats.clone(),
 			request_middleware: self.request_middleware.clone(),
-			metadata: Default::default(),
-			remote: self.remote.clone(),
+			metadata: None,
+			executor: self.executor.clone(),
 			task_slab: Arc::new(Mutex::new(Slab::with_capacity(0))),
 		}
 	}
@@ -364,10 +364,7 @@ fn header_is_allowed<T>(allowed: &Option<Vec<T>>, header: Option<&[u8]>) -> bool
 
 
 fn forbidden(title: &str, message: &str) -> ws::Response {
-	let mut forbidden = ws::Response::new(403, "Forbidden");
-	forbidden.set_body(
-		format!("{}\n{}\n", title, message).as_bytes()
-	);
+	let mut forbidden = ws::Response::new(403, "Forbidden", format!("{}\n{}\n", title, message).into_bytes());
 	{
 		let headers = forbidden.headers_mut();
 		headers.push(("Connection".to_owned(), "close".as_bytes().to_vec()));

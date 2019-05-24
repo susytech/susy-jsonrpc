@@ -1,6 +1,6 @@
-use jsonrpc::futures::sync::mpsc;
-use jsonrpc::Metadata;
-use server_utils::session;
+use crate::jsonrpc::futures::sync::mpsc;
+use crate::jsonrpc::Metadata;
+use crate::server_utils::session;
 
 /// Request context
 pub struct RequestContext<'a> {
@@ -29,6 +29,6 @@ impl<M, F> MetaExtractor<M> for F where
 
 /// Noop-extractor
 pub struct NoopExtractor;
-impl<M: Metadata> MetaExtractor<M> for NoopExtractor {
+impl<M: Metadata + Default> MetaExtractor<M> for NoopExtractor {
 	fn extract(&self, _context: &RequestContext) -> M { M::default() }
 }

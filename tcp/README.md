@@ -9,18 +9,14 @@ TCP server for JSON-RPC 2.0.
 
 ```
 [dependencies]
-susy-jsonrpc-core = "6.0"
-susy-jsonrpc-tcp-server = "6.0"
+susy-jsonrpc-tcp-server = "10.0"
 ```
 
 `main.rs`
 
 ```rust
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_tcp_server;
-
-use susy_jsonrpc_core::*;
 use susy_jsonrpc_tcp_server::*;
+use susy_jsonrpc_tcp_server::susy_jsonrpc_core::*;
 
 fn main() {
 	let mut io = IoHandler::default();

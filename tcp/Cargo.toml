@@ -1,23 +1,24 @@
 [package]
-name = "susy-jsonrpc-tcp-server"
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
 description = "TCP/IP server for JSON-RPC"
-version = "8.0.0"
-authors = ["NikVolf <nikvolf@gmail.com>"]
-license = "MIT"
+documentation = "https://docs.rs/susy-jsonrpc-tcp-server/"
+edition = "2018"
 homepage = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-tcp-server"
 repository = "https://github.com/susytech/susy-jsonrpc"
-documentation = "https://susytech.github.io/jsonrpc/susy_jsonrpc_tcp_server/index.html"
+version = "10.0.1"
 
 [dependencies]
-log = { version="0.3", registry="susytech" }
-parking_lot = { version = "0.4", registry="susytech" }
-tokio-service = { version = "0.1", registry="susytech"}
-susy-jsonrpc-core = { version = "8.0", registry="susytech" }
-susy-jsonrpc-server-utils = { version = "8.0", registry="susytech" }
+log = {version="0.4",registry="susytech"}
+parking_lot = {version="0.7",registry="susytech"}
+tokio-service = {version="0.1",registry="susytech"}
+susy-jsonrpc-core = { version = "10.0",registry="susytech"}
+susy-jsonrpc-server-utils = { version = "10.0",registry="susytech"}
 
 [dev-dependencies]
-lazy_static = {version="0.2",registry="susytech"}
-env_logger = {version="0.4",registry="susytech"}
+lazy_static = {version="1.0",registry="susytech"}
+env_logger = {version="0.6",registry="susytech"}
 
 [badges]
 travis-ci = { repository = "susytech/susy-jsonrpc", branch = "master"}

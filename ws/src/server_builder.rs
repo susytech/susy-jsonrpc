@@ -1,17 +1,17 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use core;
-use server_utils;
-use server_utils::cors::Origin;
-use server_utils::hosts::{Host, DomainsValidation};
-use server_utils::reactor::UninitializedRemote;
-use server_utils::session::SessionStats;
+use crate::core;
+use crate::server_utils;
+use crate::server_utils::cors::Origin;
+use crate::server_utils::hosts::{Host, DomainsValidation};
+use crate::server_utils::reactor::UninitializedExecutor;
+use crate::server_utils::session::SessionStats;
 
-use error::Result;
-use metadata::{MetaExtractor, NoopExtractor};
-use server::Server;
-use session;
+use crate::error::Result;
+use crate::metadata::{MetaExtractor, NoopExtractor};
+use crate::server::Server;
+use crate::session;
 
 /// Builder for `WebSockets` server
 pub struct ServerBuilder<M: core::Metadata, S: core::Middleware<M>> {
@@ -21,28 +21,42 @@ pub struct ServerBuilder<M: core::Metadata, S: core::Middleware<M>> {
 	allowed_hosts: Option<Vec<Host>>,
 	request_middleware: Option<Arc<session::RequestMiddleware>>,
 	session_stats: Option<Arc<SessionStats>>,
-	remote: UninitializedRemote,
+	executor: UninitializedExecutor,
+	max_connections: usize,
+	max_payload_bytes: usize,
 }
 
-impl<M: core::Metadata, S: core::Middleware<M>> ServerBuilder<M, S> {
+impl<M: core::Metadata + Default, S: core::Middleware<M>> ServerBuilder<M, S> {
 	/// Creates new `ServerBuilder`
 	pub fn new<T>(handler: T) -> Self where
 		T: Into<core::MetaIoHandler<M, S>>,
 	{
+		Self::with_meta_extractor(handler, NoopExtractor)
+	}
+}
+
+impl<M: core::Metadata, S: core::Middleware<M>> ServerBuilder<M, S> {
+	/// Creates new `ServerBuilder`
+	pub fn with_meta_extractor<T, E>(handler: T, extractor: E) -> Self where
+		T: Into<core::MetaIoHandler<M, S>>,
+		E: MetaExtractor<M>,
+	{
 		ServerBuilder {
 			handler: Arc::new(handler.into()),
-			meta_extractor: Arc::new(NoopExtractor),
+			meta_extractor: Arc::new(extractor),
 			allowed_origins: None,
 			allowed_hosts: None,
 			request_middleware: None,
 			session_stats: None,
-			remote: UninitializedRemote::Unspawned,
+			executor: UninitializedExecutor::Unspawned,
+			max_connections: 100,
+			max_payload_bytes: 5 * 1024 * 1024,
 		}
 	}
 
-	/// Utilize existing event loop remote to poll RPC results.
-	pub fn event_loop_remote(mut self, remote: server_utils::tokio_core::reactor::Remote) -> Self {
-		self.remote = UninitializedRemote::Shared(remote);
+	/// Utilize existing event loop executor to poll RPC results.
+	pub fn event_loop_executor(mut self, executor: server_utils::tokio::runtime::TaskExecutor) -> Self {
+		self.executor = UninitializedExecutor::Shared(executor);
 		self
 	}
 
@@ -77,6 +91,20 @@ impl<M: core::Metadata, S: core::Middleware<M>> ServerBuilder<M, S> {
 		self
 	}
 
+	/// Maximal number of concurrent connections this server supports.
+	/// Default: 100
+	pub fn max_connections(mut self, max_connections: usize) -> Self {
+		self.max_connections = max_connections;
+		self
+	}
+
+	/// Maximal size of the payload (in bytes)
+	/// Default: 5MB
+	pub fn max_payload(mut self, max_payload_bytes: usize) -> Self {
+		self.max_payload_bytes = max_payload_bytes;
+		self
+	}
+
 	/// Starts a new `WebSocket` server in separate thread.
 	/// Returns a `Server` handle which closes the server when droped.
 	pub fn start(self, addr: &SocketAddr) -> Result<Server> {
@@ -88,7 +116,9 @@ impl<M: core::Metadata, S: core::Middleware<M>> ServerBuilder<M, S> {
 			self.allowed_hosts,
 			self.request_middleware,
 			self.session_stats,
-			self.remote,
+			self.executor,
+			self.max_connections,
+			self.max_payload_bytes,
 		)
 	}
 

@@ -4,44 +4,57 @@ use std::sync::Arc;
 
 use tokio_service::Service as TokioService;
 
-use jsonrpc::{MetaIoHandler, Metadata, Middleware, NoopMiddleware};
-use jsonrpc::futures::{future, Future, Stream, Sink};
-use jsonrpc::futures::sync::{mpsc, oneshot};
-use server_utils::{reactor, tokio_core, codecs};
-use server_utils::tokio_io::AsyncRead;
+use crate::jsonrpc::{middleware, MetaIoHandler, Metadata, Middleware};
+use crate::jsonrpc::futures::{future, Future, Stream, Sink};
+use crate::jsonrpc::futures::sync::{mpsc, oneshot};
+use crate::server_utils::{
+	tokio_codec::Framed,
+	tokio, reactor, codecs,
+	SuspendableStream
+};
 
-use dispatch::{Dispatcher, SenderChannels, PeerMessageQueue};
-use meta::{MetaExtractor, RequestContext, NoopExtractor};
-use service::Service;
+use crate::dispatch::{Dispatcher, SenderChannels, PeerMessageQueue};
+use crate::meta::{MetaExtractor, RequestContext, NoopExtractor};
+use crate::service::Service;
 
 /// TCP server builder
-pub struct ServerBuilder<M: Metadata = (), S: Middleware<M> = NoopMiddleware> {
-	remote: reactor::UninitializedRemote,
+pub struct ServerBuilder<M: Metadata = (), S: Middleware<M> = middleware::Noop> {
+	executor: reactor::UninitializedExecutor,
 	handler: Arc<MetaIoHandler<M, S>>,
 	meta_extractor: Arc<MetaExtractor<M>>,
 	channels: Arc<SenderChannels>,
-	incoming_separator: codecs::Separator, 
+	incoming_separator: codecs::Separator,
 	outgoing_separator: codecs::Separator,
 }
 
-impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
-	/// Creates new `SeverBuilder` wih given `IoHandler`
+impl<M: Metadata + Default, S: Middleware<M> + 'static> ServerBuilder<M, S> {
+	/// Creates new `ServerBuilder` wih given `IoHandler`
 	pub fn new<T>(handler: T) -> Self where
-		T: Into<MetaIoHandler<M, S>>
+		T: Into<MetaIoHandler<M, S>>,
+	{
+		Self::with_meta_extractor(handler, NoopExtractor)
+	}
+}
+
+impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
+	/// Creates new `ServerBuilder` wih given `IoHandler`
+	pub fn with_meta_extractor<T, E>(handler: T, extractor: E) -> Self where
+		T: Into<MetaIoHandler<M, S>>,
+		E: MetaExtractor<M> + 'static,
 	{
 		ServerBuilder {
-			remote: reactor::UninitializedRemote::Unspawned,
+			executor: reactor::UninitializedExecutor::Unspawned,
 			handler: Arc::new(handler.into()),
-			meta_extractor: Arc::new(NoopExtractor),
+			meta_extractor: Arc::new(extractor),
 			channels: Default::default(),
 			incoming_separator: Default::default(),
 			outgoing_separator: Default::default(),
 		}
 	}
 
-	/// Utilize existing event loop remote.
-	pub fn event_loop_remote(mut self, remote: tokio_core::reactor::Remote) -> Self {
-		self.remote = reactor::UninitializedRemote::Shared(remote);
+	/// Utilize existing event loop executor.
+	pub fn event_loop_executor(mut self, handle: tokio::runtime::TaskExecutor) -> Self {
+		self.executor = reactor::UninitializedExecutor::Shared(handle);
 		self
 	}
 
@@ -67,16 +80,17 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 		let outgoing_separator = self.outgoing_separator;
 		let address = addr.to_owned();
 		let (tx, rx) = std::sync::mpsc::channel();
-		let (signal, stop) = oneshot::channel();
+		let (stop_tx, stop_rx) = oneshot::channel();
 
-		let remote = self.remote.initialize()?;
+		let executor = self.executor.initialize()?;
 
-		remote.remote().spawn(move |handle| {
+		executor.spawn(future::lazy(move || {
 			let start = move || {
-				let listener = tokio_core::net::TcpListener::bind(&address, handle)?;
-				let connections = listener.incoming();
-				let remote = handle.remote().clone();
-				let server = connections.for_each(move |(socket, peer_addr)| {
+				let listener = tokio::net::TcpListener::bind(&address)?;
+				let connections = SuspendableStream::new(listener.incoming());
+
+				let server = connections.for_each(move |socket| {
+					let peer_addr = socket.peer_addr().expect("Unable to determine socket peer address");
 					trace!(target: "tcp", "Accepted incoming connection from {}", &peer_addr);
 					let (sender, receiver) = mpsc::channel(65536);
 
@@ -87,12 +101,13 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 
 					let meta = meta_extractor.extract(&context);
 					let service = Service::new(peer_addr, rpc_handler.clone(), meta);
-					let (writer, reader) = socket.framed(
-						codecs::StreamCodec::new(
-							incoming_separator.clone(),
-							outgoing_separator.clone(),
-						)
-					).split();
+					let (writer, reader) = Framed::new(
+		                socket,
+		                codecs::StreamCodec::new(
+		                    incoming_separator.clone(),
+		                    outgoing_separator.clone(),
+		                ),
+		            ).split();
 
 					let responses = reader.and_then(
 						move |req| service.call(req).then(|response| match response {
@@ -130,7 +145,7 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 						Ok(())
 					});
 
-					remote.spawn(|_| writer);
+					tokio::spawn(writer);
 
 					Ok(())
 				});
@@ -138,7 +153,7 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 				Ok(server)
 			};
 
-			let stop = stop.map_err(|_| std::io::ErrorKind::Interrupted.into());
+			let stop = stop_rx.map_err(|_| ());
 			match start() {
 				Ok(server) => {
 					tx.send(Ok(())).expect("Rx is blocking parent thread.");
@@ -156,13 +171,13 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 						}))
 				},
 			}
-		});
+		}));
 
 		let res = rx.recv().expect("Response is always sent before tx is dropped.");
 
 		res.map(|_| Server {
-			remote: Some(remote),
-			stop: Some(signal),
+			executor: Some(executor),
+			stop: Some(stop_tx),
 		})
 	}
 
@@ -174,7 +189,7 @@ impl<M: Metadata, S: Middleware<M> + 'static> ServerBuilder<M, S> {
 
 /// TCP Server handle
 pub struct Server {
-	remote: Option<reactor::Remote>,
+	executor: Option<reactor::Executor>,
 	stop: Option<oneshot::Sender<()>>,
 }
 
@@ -182,18 +197,18 @@ impl Server {
 	/// Closes the server (waits for finish)
 	pub fn close(mut self) {
 		let _ = self.stop.take().map(|sg| sg.send(()));
-		self.remote.take().unwrap().close();
+		self.executor.take().unwrap().close();
 	}
 
 	/// Wait for the server to finish
 	pub fn wait(mut self) {
-		self.remote.take().unwrap().wait();
+		self.executor.take().unwrap().wait();
 	}
 }
 
 impl Drop for Server {
 	fn drop(&mut self) {
 		let _ = self.stop.take().map(|sg| sg.send(()));
-		self.remote.take().map(|remote| remote.close());
+		self.executor.take().map(|executor| executor.close());
 	}
 }

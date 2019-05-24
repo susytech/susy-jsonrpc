@@ -1,5 +1,3 @@
-extern crate susy_jsonrpc_core;
-
 use susy_jsonrpc_core::*;
 
 fn main() {

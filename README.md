@@ -4,20 +4,24 @@ Rust implementation of JSON-RPC 2.0 Specification.
 Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` and `tcp`.
 
 [![Build Status][travis-image]][travis-url]
+[![Build Status][appveyor-image]][appveyor-url]
 
 [travis-image]: https://travis-ci.org/susytech/susy-jsonrpc.svg?branch=master
 [travis-url]: https://travis-ci.org/susytech/susy-jsonrpc
+[appveyor-image]: https://ci.appveyor.com/api/projects/status/github/susytech/susy-jsonrpc?svg=true
+[appveyor-url]: https://ci.appveyor.com/project/susytech/susy-jsonrpc/branch/master
 
 [Documentation](http://susytech.github.io/jsonrpc/)
 
 ## Sub-projects
 - [susy-jsonrpc-core](./core) [![crates.io][core-image]][core-url]
 - [susy-jsonrpc-http-server](./http) [![crates.io][http-server-image]][http-server-url]
-- [susy-jsonrpc-minihttp-server](./minihttp)
-- [susy-jsonrpc-ipc-server](./ipc)
+- [susy-jsonrpc-ipc-server](./ipc) [![crates.io][ipc-server-image]][ipc-server-url]
 - [susy-jsonrpc-tcp-server](./tcp) [![crates.io][tcp-server-image]][tcp-server-url]
-- [susy-jsonrpc-ws-server](./ws)
-- [susy-jsonrpc-macros](./macros) [![crates.io][macros-image]][macros-url]
+- [susy-jsonrpc-ws-server](./ws) [![crates.io][ws-server-image]][ws-server-url]
+- [susy-jsonrpc-stdio-server](./stdio) [![crates.io][stdio-server-image]][stdio-server-url]
+- [susy-jsonrpc-macros](./macros) [![crates.io][macros-image]][macros-url] *deprecated:* use `derive` instead
+- [susy-jsonrpc-derive](./derive) [![crates.io][derive-image]][derive-url]
 - [susy-jsonrpc-server-utils](./server-utils) [![crates.io][server-utils-image]][server-utils-url]
 - [susy-jsonrpc-pubsub](./pubsub) [![crates.io][pubsub-image]][pubsub-url]
 
@@ -25,10 +29,18 @@ Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` 
 [core-url]: https://crates.io/crates/susy-jsonrpc-core
 [http-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-http-server.svg
 [http-server-url]: https://crates.io/crates/susy-jsonrpc-http-server
+[ipc-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-ipc-server.svg
+[ipc-server-url]: https://crates.io/crates/susy-jsonrpc-ipc-server
 [tcp-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-tcp-server.svg
 [tcp-server-url]: https://crates.io/crates/susy-jsonrpc-tcp-server
+[ws-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-ws-server.svg
+[ws-server-url]: https://crates.io/crates/susy-jsonrpc-ws-server
+[stdio-server-image]: https://img.shields.io/crates/v/susy-jsonrpc-stdio-server.svg
+[stdio-server-url]: https://crates.io/crates/susy-jsonrpc-stdio-server
 [macros-image]: https://img.shields.io/crates/v/susy-jsonrpc-macros.svg
 [macros-url]: https://crates.io/crates/susy-jsonrpc-macros
+[derive-image]: https://img.shields.io/crates/v/susy-jsonrpc-derive.svg
+[derive-url]: https://crates.io/crates/susy-jsonrpc-derive
 [server-utils-image]: https://img.shields.io/crates/v/susy-jsonrpc-server-utils.svg
 [server-utils-url]: https://crates.io/crates/susy-jsonrpc-server-utils
 [pubsub-image]: https://img.shields.io/crates/v/susy-jsonrpc-pubsub.svg
@@ -37,17 +49,15 @@ Transport-agnostic `core` and transport servers for `http`, `ipc`, `websockets` 
 ## Examples
 
 - [core](./core/examples)
-- [macros](./macros/examples)
+- [derive](./derive/examples)
+- [macros](./macros/examples) *deprecated*
 - [pubsub](./pubsub/examples)
 
 ### Basic Usage (with HTTP transport)
 
 ```rust
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_minihttp_server;
-
 use susy_jsonrpc_core::{IoHandler, Value, Params};
-use susy_jsonrpc_minihttp_server::{ServerBuilder};
+use susy_jsonrpc_http_server::{ServerBuilder};
 
 fn main() {
 	let mut io = IoHandler::new();
@@ -64,21 +74,17 @@ fn main() {
 }
 ```
 
-### Basic usage with macros
+### Basic usage with derive
 
 ```rust
-extern crate susy_jsonrpc_core;
-#[macro_use]
-extern crate susy_jsonrpc_macros;
-
 use susy_jsonrpc_core::Result;
+use susy_jsonrpc_derive::rpc;
 
-build_rpc_trait! {
-	pub trait Rpc {
-		/// Adds two numbers and returns a result
-		#[rpc(name = "add")]
-		fn add(&self, u64, u64) -> Result<u64>;
-	}
+#[rpc]
+pub trait Rpc {
+	/// Adds two numbers and returns a result
+	#[rpc(name = "add")]
+	fn add(&self, u64, u64) -> Result<u64>;
 }
 
 pub struct RpcImpl;
@@ -87,7 +93,6 @@ impl Rpc for RpcImpl {
 		Ok(a + b)
 	}
 }
-
 
 fn main() {
 	let mut io = susy_jsonrpc_core::IoHandler::new();

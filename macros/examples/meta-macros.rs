@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use susy_jsonrpc_core::{futures, MetaIoHandler, Metadata, Error, Value, Result};
 use susy_jsonrpc_core::futures::future::FutureResult;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct Meta(String);
 impl Metadata for Meta {}
 
@@ -62,8 +62,8 @@ fn main() {
 
 	io.extend_with(rpc.to_delegate());
 
-	let server = susy_jsonrpc_tcp_server::ServerBuilder::new(io)
-		.session_meta_extractor(|context: &susy_jsonrpc_tcp_server::RequestContext| {
+	let server = susy_jsonrpc_tcp_server::ServerBuilder
+		::with_meta_extractor(io, |context: &susy_jsonrpc_tcp_server::RequestContext| {
 			Meta(format!("{}", context.peer_addr))
 		})
 		.start(&"0.0.0.0:3030".parse().unwrap())

@@ -19,8 +19,6 @@ susy-jsonrpc-core = "4.0"
 `main.rs`
 
 ```rust
-extern crate susy_jsonrpc_core;
-
 use susy_jsonrpc_core::*;
 
 fn main() {
@@ -41,8 +39,6 @@ fn main() {
 `main.rs`
 
 ```rust
-extern crate susy_jsonrpc_core;
-
 use susy_jsonrpc_core::*;
 use susy_jsonrpc_core::futures::Future;
 

@@ -3,8 +3,6 @@
 //! Right now it supports only server side handling requests.
 //!
 //! ```rust
-//! extern crate susy_jsonrpc_core;
-//!
 //! use susy_jsonrpc_core::*;
 //! use susy_jsonrpc_core::futures::Future;
 //!
@@ -25,9 +23,8 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
-extern crate serde;
 
-pub extern crate futures;
+pub use futures;
 
 #[doc(hidden)]
 pub extern crate serde_json;
@@ -35,8 +32,9 @@ pub extern crate serde_json;
 mod calls;
 mod io;
 
-mod middleware;
+pub mod middleware;
 pub mod types;
+pub mod delegates;
 
 /// A `Future` trait object.
 pub type BoxFuture<T> = Box<futures::Future<Item = T, Error = Error> + Send>;
@@ -44,7 +42,8 @@ pub type BoxFuture<T> = Box<futures::Future<Item = T, Error = Error> + Send>;
 /// A Result type.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
-pub use calls::{RemoteProcedure, Metadata, RpcMethodSimple, RpcMethod, RpcNotificationSimple, RpcNotification};
-pub use io::{Compatibility, IoHandler, MetaIoHandler, FutureResponse, FutureResult};
-pub use middleware::{Middleware, Noop as NoopMiddleware};
-pub use types::*;
+pub use crate::calls::{RemoteProcedure, Metadata, RpcMethodSimple, RpcMethod, RpcNotificationSimple, RpcNotification};
+pub use crate::delegates::IoDelegate;
+pub use crate::io::{Compatibility, IoHandler, MetaIoHandler, FutureOutput, FutureResult, FutureResponse, FutureRpcResult};
+pub use crate::middleware::{Middleware, Noop as NoopMiddleware};
+pub use crate::types::*;

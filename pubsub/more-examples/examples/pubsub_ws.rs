@@ -6,30 +6,10 @@ use std::{time, thread};
 use std::sync::Arc;
 
 use susy_jsonrpc_core::*;
-use susy_jsonrpc_pubsub::{PubSubHandler, PubSubMetadata, Session, Subscriber, SubscriptionId};
+use susy_jsonrpc_pubsub::{PubSubHandler, Session, Subscriber, SubscriptionId};
 use susy_jsonrpc_ws_server::{ServerBuilder, RequestContext};
 
 use susy_jsonrpc_core::futures::Future;
-
-#[derive(Clone)]
-struct Meta {
-	session: Option<Arc<Session>>,
-}
-
-impl Default for Meta {
-	fn default() -> Self {
-		Meta {
-			session: None,
-		}
-	}
-}
-
-impl Metadata for Meta {}
-impl PubSubMetadata for Meta {
-	fn session(&self) -> Option<Arc<Session>> {
-		self.session.clone()
-	}
-}
 
 /// Use following node.js code to test:
 ///
@@ -44,7 +24,7 @@ impl PubSubMetadata for Meta {
 ///     jsonrpc: "2.0",
 ///     id: 1,
 ///     method: "subscribe_hello",
-///     params: [],
+///     params: null,
 ///   }));
 /// });
 ///
@@ -88,18 +68,13 @@ fn main() {
 				}
 			});
 		}),
-		("remove_hello", |_id: SubscriptionId| -> BoxFuture<Value> {
+		("remove_hello", |_id: SubscriptionId, _meta| -> BoxFuture<Value> {
 			println!("Closing subscription");
 			Box::new(futures::future::ok(Value::Bool(true)))
 		}),
 	);
 
-	let server = ServerBuilder::new(io)
-		.session_meta_extractor(|context: &RequestContext| {
-			Meta {
-				session: Some(Arc::new(Session::new(context.sender()))),
-			}
-		})
+	let server = ServerBuilder::with_meta_extractor(io, |context: &RequestContext| Arc::new(Session::new(context.sender())))
 		.start(&"127.0.0.1:3030".parse().unwrap())
 		.expect("Unable to start RPC server");
 

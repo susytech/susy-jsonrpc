@@ -1,22 +1,21 @@
 //! jsonrpc params field
-use std::fmt;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde::de::{Visitor, SeqAccess, MapAccess, DeserializeOwned};
+use serde::de::{DeserializeOwned};
 use serde_json;
 use serde_json::value::from_value;
 
 use super::{Value, Error};
 
 /// Request parameters
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Params {
+	/// No parameters
+	None,
 	/// Array of values
 	Array(Vec<Value>),
 	/// Map of values
 	Map(serde_json::Map<String, Value>),
-	/// No parameters
-	None
 }
 
 impl Params {
@@ -32,59 +31,14 @@ impl Params {
 			Error::invalid_params(format!("Invalid params: {}.", e))
 		})
 	}
-}
 
-impl Serialize for Params {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where S: Serializer {
-		match *self {
-			Params::Array(ref vec) => vec.serialize(serializer),
-			Params::Map(ref map) => map.serialize(serializer),
-			Params::None => ([0u8; 0]).serialize(serializer)
+	/// Check for no params, returns Err if any params
+	pub fn expect_no_params(self) -> Result<(), Error> {
+		match self {
+			Params::None => Ok(()),
+			Params::Array(ref v) if v.is_empty() => Ok(()),
+			p => Err(Error::invalid_params_with_details("No parameters were expected", p)),
 		}
-	}
-}
-
-struct ParamsVisitor;
-
-impl<'a> Deserialize<'a> for Params {
-	fn deserialize<D>(deserializer: D) -> Result<Params, D::Error>
-	where D: Deserializer<'a> {
-		deserializer.deserialize_identifier(ParamsVisitor)
-	}
-}
-
-impl<'a> Visitor<'a> for ParamsVisitor {
-	type Value = Params;
-
-	fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-		formatter.write_str("a map or sequence")
-	}
-
-	fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
-	where V: SeqAccess<'a> {
-		let mut values = Vec::new();
-
-		while let Some(value) = visitor.next_element()? {
-			values.push(value);
-		}
-
-		if values.is_empty() {
-			Ok(Params::None)
-		} else {
-			Ok(Params::Array(values))
-		}
-	}
-
-	fn visit_map<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
-	where V: MapAccess<'a> {
-		let mut values = serde_json::Map::new();
-
-		while let Some((key, value)) = visitor.next_entry()? {
-			values.insert(key, value);
-		}
-
-		Ok(if values.is_empty() { Params::None } else { Params::Map(values) })
 	}
 }
 
@@ -92,12 +46,11 @@ impl<'a> Visitor<'a> for ParamsVisitor {
 mod tests {
 	use serde_json;
 	use super::Params;
-	use types::{Value, Error, ErrorCode};
+	use crate::types::{Value, Error, ErrorCode};
 
 	#[test]
 	fn params_deserialization() {
-
-		let s = r#"[null, true, -1, 4, 2.3, "hello", [0], {"key": "value"}]"#;
+		let s = r#"[null, true, -1, 4, 2.3, "hello", [0], {"key": "value"}, []]"#;
 		let deserialized: Params = serde_json::from_str(s).unwrap();
 
 		let mut map = serde_json::Map::new();
@@ -106,7 +59,9 @@ mod tests {
 		assert_eq!(Params::Array(vec![
 								 Value::Null, Value::Bool(true), Value::from(-1), Value::from(4),
 								 Value::from(2.3), Value::String("hello".to_string()),
-								 Value::Array(vec![Value::from(0)]), Value::Object(map)]), deserialized);
+								 Value::Array(vec![Value::from(0)]), Value::Object(map),
+								 Value::Array(vec![]),
+		]), deserialized);
 	}
 
 	#[test]
@@ -128,5 +83,11 @@ mod tests {
 		assert_eq!(err2.code, ErrorCode::InvalidParams);
 		assert_eq!(err2.message, "Invalid params: invalid length 2, expected a tuple of size 3.");
 		assert_eq!(err2.data, None);
+	}
+
+	#[test]
+	fn single_param_parsed_as_tuple() {
+		let params: (u64,) = Params::Array(vec![Value::from(1)]).parse().unwrap();
+		assert_eq!(params, (1,));
 	}
 }

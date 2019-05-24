@@ -1,8 +1,8 @@
-use core;
-use core::futures::{Future, IntoFuture};
+use crate::core;
+use crate::core::futures::{Future, IntoFuture};
 
-use types::{PubSubMetadata, SubscriptionId};
-use subscription::{Subscriber, new_subscription};
+use crate::types::{PubSubMetadata, SubscriptionId};
+use crate::subscription::{Subscriber, new_subscription};
 
 /// Subscribe handler
 pub trait SubscribeRpcMethod<M: PubSubMetadata>: Send + Sync + 'static {
@@ -20,26 +20,28 @@ impl<M, F> SubscribeRpcMethod<M> for F where
 }
 
 /// Unsubscribe handler
-pub trait UnsubscribeRpcMethod: Send + Sync + 'static {
+pub trait UnsubscribeRpcMethod<M>: Send + Sync + 'static {
 	/// Output type
 	type Out: Future<Item = core::Value, Error = core::Error> + Send + 'static;
 	/// Called when client is requesting to cancel existing subscription.
-	fn call(&self, id: SubscriptionId) -> Self::Out;
+	///
+	/// Metadata is not available if the session was closed without unsubscribing.
+	fn call(&self, id: SubscriptionId, meta: Option<M>) -> Self::Out;
 }
 
-impl<F, I> UnsubscribeRpcMethod for F where
-	F: Fn(SubscriptionId) -> I + Send + Sync + 'static,
+impl<M, F, I> UnsubscribeRpcMethod<M> for F where
+	F: Fn(SubscriptionId, Option<M>) -> I + Send + Sync + 'static,
 	I: IntoFuture<Item = core::Value, Error = core::Error>,
 	I::Future: Send + 'static,
 {
 	type Out = I::Future;
-	fn call(&self, id: SubscriptionId) -> Self::Out {
-		(*self)(id).into_future()
+	fn call(&self, id: SubscriptionId, meta: Option<M>) -> Self::Out {
+		(*self)(id, meta).into_future()
 	}
 }
 
 /// Publish-Subscribe extension of `IoHandler`.
-pub struct PubSubHandler<T: PubSubMetadata, S: core::Middleware<T> = core::NoopMiddleware> {
+pub struct PubSubHandler<T: PubSubMetadata, S: core::Middleware<T> = core::middleware::Noop> {
 	handler: core::MetaIoHandler<T, S>,
 }
 
@@ -67,7 +69,7 @@ impl<T: PubSubMetadata, S: core::Middleware<T>> PubSubHandler<T, S> {
 		unsubscribe: (&str, G),
 	) where
 		F: SubscribeRpcMethod<T>,
-		G: UnsubscribeRpcMethod,
+		G: UnsubscribeRpcMethod<T>,
 	{
 		let (sub, unsub) = new_subscription(notification, subscribe.1, unsubscribe.1);
 		self.handler.add_method_with_meta(subscribe.0, sub);
@@ -100,21 +102,20 @@ mod tests {
 	use std::sync::Arc;
 	use std::sync::atomic::{AtomicBool, Ordering};
 
-	use core;
-	use core::futures::future;
-	use core::futures::sync::mpsc;
-	use subscription::{Session, Subscriber};
-	use types::{PubSubMetadata, SubscriptionId};
+	use crate::core;
+	use crate::core::futures::future;
+	use crate::core::futures::sync::mpsc;
+	use crate::subscription::{Session, Subscriber};
+	use crate::types::{PubSubMetadata, SubscriptionId};
 
 	use super::PubSubHandler;
 
-	#[derive(Clone, Default)]
-	struct Metadata;
+	#[derive(Clone)]
+	struct Metadata(Arc<Session>);
 	impl core::Metadata for Metadata {}
 	impl PubSubMetadata for Metadata {
 		fn session(&self) -> Option<Arc<Session>> {
-			let (tx, _rx) = mpsc::channel(1);
-			Some(Arc::new(Session::new(tx)))
+			Some(self.0.clone())
 		}
 	}
 
@@ -130,7 +131,7 @@ mod tests {
 				assert_eq!(params, core::Params::None);
 				let _sink = subscriber.assign_id(SubscriptionId::Number(5));
 			}),
-			("unsubscribe_hello", move |id| {
+			("unsubscribe_hello", move |id, _meta| {
 				// Should be called because session is dropped.
 				called2.store(true, Ordering::SeqCst);
 				assert_eq!(id, SubscriptionId::Number(5));
@@ -139,7 +140,8 @@ mod tests {
 		);
 
 		// when
-		let meta = Metadata;
+		let (tx, _rx) = mpsc::channel(1);
+		let meta = Metadata(Arc::new(Session::new(tx)));
 		let req = r#"{"jsonrpc":"2.0","id":1,"method":"subscribe_hello","params":null}"#;
 		let res = handler.handle_request_sync(req, meta);
 

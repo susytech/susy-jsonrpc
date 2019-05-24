@@ -1,20 +1,17 @@
 //! An utility package to test susy-jsonrpc-core based projects.
 //!
 //! ```
-//! #[macro_use]
-//! extern crate susy_jsonrpc_macros;
+//! use susy_jsonrpc_derive::rpc;
+//! use susy_jsonrpc_test as test;
 //!
-//! extern crate susy_jsonrpc_core as core;
-//! extern crate susy_jsonrpc_test as test;
+//! use susy_jsonrpc_core::{Result, Error, IoHandler};
 //!
-//! use core::Result;
-//!
-//! build_rpc_trait! {
-//!   pub trait Test {
-//!     #[rpc(name = "rpc_some_method")]
-//!	    fn some_method(&self, u64) -> Result<u64>;
-//!   }
+//! #[rpc]
+//! pub trait Test {
+//! 	#[rpc(name = "rpc_some_method")]
+//!	    fn some_method(&self, _: u64) -> Result<u64>;
 //! }
+//!
 //!
 //! struct Dummy;
 //! impl Test for Dummy {
@@ -32,9 +29,9 @@
 //!
 //!   // You can also test RPC created without macros:
 //!   let rpc = {
-//!     let mut io = core::IoHandler::new();
+//!     let mut io = IoHandler::new();
 //!     io.add_method("rpc_test_method", |_| {
-//!		  Err(core::Error::internal_error())
+//!		  Err(Error::internal_error())
 //!		});
 //!     test::Rpc::from(io)
 //!   };
@@ -49,8 +46,8 @@
 #[warn(missing_docs)]
 
 extern crate susy_jsonrpc_core as rpc;
-extern crate serde;
-extern crate serde_json;
+use serde;
+use serde_json;
 
 use std::collections::HashMap;
 
@@ -70,6 +67,11 @@ pub struct Rpc {
 	pub options: Options,
 }
 
+pub enum Encoding {
+	Compact,
+	Pretty,
+}
+
 impl From<rpc::IoHandler> for Rpc {
 	fn from(io: rpc::IoHandler) -> Self {
 		Rpc { io, ..Default::default() }
@@ -86,8 +88,20 @@ impl Rpc {
 		io.into()
 	}
 
-	/// Perform a single, synchronous method call.
+	/// Perform a single, synchronous method call and return pretty-printed value
 	pub fn request<T>(&self, method: &str, params: &T) -> String where
+		T: serde::Serialize,
+	{
+		self.make_request(method, params, Encoding::Pretty)
+	}
+
+	/// Perform a single, synchronous method call.
+	pub fn make_request<T>(
+		&self,
+		method: &str,
+		params: &T,
+		encoding: Encoding,
+	) -> String where
 		T: serde::Serialize,
 	{
 		use self::rpc::types::response;
@@ -104,10 +118,19 @@ impl Rpc {
 
 		// extract interesting part from the response
 		let extracted = match serde_json::from_str(&response).expect("We will always get a single output.") {
-			response::Output::Success(response::Success { result, .. }) => serde_json::to_string_pretty(&result),
-			response::Output::Failure(response::Failure { error, .. }) => serde_json::to_string_pretty(&error),
+			response::Output::Success(response::Success { result, .. }) => {
+				match encoding {
+					Encoding::Compact => serde_json::to_string(&result),
+					Encoding::Pretty => serde_json::to_string_pretty(&result),
+				}
+			},
+			response::Output::Failure(response::Failure { error, .. }) => {
+				match encoding {
+					Encoding::Compact => serde_json::to_string(&error),
+					Encoding::Pretty => serde_json::to_string_pretty(&error),
+				}
+			},
 		}.expect("Serialization is infallible; qed");
-
 
 		println!("\n{}\n --> {}\n", request, extracted);
 
@@ -120,12 +143,12 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn should_test_simple_method() {
+	fn should_test_request_is_pretty() {
 		// given
 		let rpc = {
 			let mut io = rpc::IoHandler::new();
 			io.add_method("test_method", |_| {
-				Ok(rpc::Value::Number(5.into()))
+				Ok(rpc::Value::Array(vec![5.into(), 10.into()]))
 			});
 			Rpc::from(io)
 		};
@@ -133,7 +156,25 @@ mod tests {
 		// when
 		assert_eq!(
 			rpc.request("test_method", &[5u64]),
-			r#"5"#
+			"[\n  5,\n  10\n]"
+		);
+	}
+
+	#[test]
+	fn should_test_make_request_compact() {
+		// given
+		let rpc = {
+			let mut io = rpc::IoHandler::new();
+			io.add_method("test_method", |_| {
+				Ok(rpc::Value::Array(vec![5.into(), 10.into()]))
+			});
+			Rpc::from(io)
+		};
+
+		// when
+		assert_eq!(
+			rpc.make_request("test_method", &[5u64], Encoding::Compact),
+			"[5,10]"
 		);
 	}
 }

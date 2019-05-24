@@ -1,0 +1,26 @@
+[package]
+authors = ["Susytech <admin@superstring.ch>", "Susytech <admin@susy.io>"]
+documentation = "https://docs.rs/susy-jsonrpc-derive/"
+edition = "2018"
+homepage = "https://github.com/susytech/susy-jsonrpc"
+license = "MIT"
+name = "susy-jsonrpc-derive"
+repository = "https://github.com/susytech/susy-jsonrpc"
+version = "10.0.1"
+description = "susy jsonrpc derive"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "^0.15.22", features = ["full", "extra-traits", "visit", "fold"], registry="susytech" }
+proc-macro2 = {version="0.4",registry="susytech"}
+quote = {version="0.6",registry="susytech"}
+
+[dev-dependencies]
+susy-jsonrpc-core = { version = "10.0", registry="susytech" }
+susy-jsonrpc-pubsub = { version = "10.0", registry="susytech" }
+susy-jsonrpc-tcp-server = { version = "10.0", registry="susytech" }
+serde = {version="1.0",registry="susytech"}
+serde_derive = {version="1.0",registry="susytech"}
+serde_json = {version="1.0",registry="susytech"}

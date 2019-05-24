@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc};
 
-use jsonrpc::futures::{Stream, Poll, Async, Sink, Future};
-use jsonrpc::futures::sync::mpsc;
+use crate::jsonrpc::futures::{Stream, Poll, Async, Sink, Future};
+use crate::jsonrpc::futures::sync::mpsc;
 
 use parking_lot::Mutex;
 
@@ -46,6 +46,7 @@ impl From<mpsc::SendError<String>> for PushMessageError {
 }
 
 /// Peer-messages dispatcher.
+#[derive(Clone)]
 pub struct Dispatcher {
 	channels: Arc<SenderChannels>,
 }
@@ -65,7 +66,7 @@ impl Dispatcher {
 		match channels.get_mut(peer_addr) {
 			Some(channel) => {
 				// todo: maybe async here later?
-				try!(channel.send(msg).wait().map_err(|e| PushMessageError::from(e)));
+				channel.send(msg).wait().map_err(|e| PushMessageError::from(e))?;
 				Ok(())
 			},
 			None => {

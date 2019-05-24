@@ -9,30 +9,41 @@ Rust http server using JSON-RPC 2.0.
 
 ```
 [dependencies]
-susy-jsonrpc-core = { git = "https://github.com/susytech/susy-jsonrpc" }
-susy-jsonrpc-http-server = { git = "https://github.com/susytech/susy-jsonrpc" }
+susy-jsonrpc-http-server = "10.0"
 ```
 
 `main.rs`
 
 ```rust
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_http_server;
-
-use susy_jsonrpc_core::*;
 use susy_jsonrpc_http_server::*;
+use susy_jsonrpc_http_server::susy_jsonrpc_core::*;
 
 fn main() {
-    let mut io = IoHandler::default();
-    io.add_method("say_hello", |_| {
+	let mut io = IoHandler::default();
+	io.add_method("say_hello", |_| {
 		Ok(Value::String("hello".into()))
 	});
 
-    let server = ServerBuilder::new(io)
-			.cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
-			.start_http(&"127.0.0.1:3030".parse().unwrap())
-			.expect("Unable to start RPC server");
+	let server = ServerBuilder::new(io)
+		.cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
+		.start_http(&"127.0.0.1:3030".parse().unwrap())
+		.expect("Unable to start RPC server");
 
-	server.wait().unwrap();
+	server.wait();
 }
+```
+You can now test the above server by running `cargo run` in one terminal, and from another terminal issue the following POST request to your server:
+```
+$ curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "say_hello", "id":123 }' 127.0.0.1:3030
+```
+to which the server will respond with the following:
+```
+{"jsonrpc":"2.0","result":"hello","id":123}
+```
+If you omit any of the fields above, or invoke a different method you will get an informative error message:
+```
+$ curl -X POST -H "Content-Type: application/json" -d '{"method": "say_hello", "id":123 }' 127.0.0.1:3030
+{"error":{"code":-32600,"message":"Unsupported JSON-RPC protocol version"},"id":123}
+$ curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "say_bye", "id":123 }' 127.0.0.1:3030
+{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"},"id":123}
 ```

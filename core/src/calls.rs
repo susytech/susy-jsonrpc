@@ -1,12 +1,15 @@
 use std::fmt;
 use std::sync::Arc;
-use types::{Params, Value, Error};
+use crate::types::{Params, Value, Error};
 use futures::{Future, IntoFuture};
-use BoxFuture;
+use crate::BoxFuture;
 
 /// Metadata trait
-pub trait Metadata: Default + Clone + Send + 'static {}
+pub trait Metadata: Clone + Send + 'static {}
 impl Metadata for () {}
+impl<T: Metadata> Metadata for Option<T> {}
+impl<T: Metadata> Metadata for Box<T> {}
+impl<T: Sync + Send + 'static> Metadata for Arc<T> {}
 
 /// Asynchronous Method
 pub trait RpcMethodSimple: Send + Sync + 'static {

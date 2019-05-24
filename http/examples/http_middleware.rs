@@ -1,12 +1,8 @@
-extern crate susy_jsonrpc_core;
-extern crate susy_jsonrpc_http_server;
-
-
-use susy_jsonrpc_core::{IoHandler, Value};
-use susy_jsonrpc_core::futures;
 use susy_jsonrpc_http_server::{
 	hyper, ServerBuilder, DomainsValidation, AccessControlAllowOrigin, Response, RestApi
 };
+use susy_jsonrpc_http_server::susy_jsonrpc_core::{IoHandler, Value};
+use susy_jsonrpc_http_server::susy_jsonrpc_core::futures;
 
 fn main() {
 	let mut io = IoHandler::default();
@@ -16,8 +12,8 @@ fn main() {
 
 	let server = ServerBuilder::new(io)
 		.cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
-		.request_middleware(|request: hyper::server::Request| {
-			if request.path() == "/status" {
+		.request_middleware(|request: hyper::Request<hyper::Body>| {
+			if request.uri() == "/status" {
 				Response::ok("Server running OK.").into()
 			} else {
 				request.into()

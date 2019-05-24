@@ -6,9 +6,17 @@ extern crate susy_jsonrpc_macros;
 
 use std::sync::Arc;
 use susy_jsonrpc_core::futures::sync::mpsc;
-use susy_jsonrpc_core::Result;
 use susy_jsonrpc_pubsub::{PubSubHandler, SubscriptionId, Session, PubSubMetadata};
 use susy_jsonrpc_macros::{pubsub, Trailing};
+
+pub enum MyError {}
+impl From<MyError> for susy_jsonrpc_core::Error {
+	fn from(_e: MyError) -> Self {
+		unreachable!()
+	}
+}
+
+type Result<T> = ::std::result::Result<T, MyError>;
 
 build_rpc_trait! {
 	pub trait Rpc {
@@ -21,7 +29,7 @@ build_rpc_trait! {
 
 			/// Unsubscribe from hello subscription.
 			#[rpc(name = "hello_unsubscribe")]
-			fn unsubscribe(&self, SubscriptionId) -> Result<bool>;
+			fn unsubscribe(&self, Option<Self::Metadata>, SubscriptionId) -> Result<bool>;
 		}
 	}
 }
@@ -36,7 +44,7 @@ impl Rpc for RpcImpl {
 		let _sink = subscriber.assign_id(SubscriptionId::Number(5));
 	}
 
-	fn unsubscribe(&self, _id: SubscriptionId) -> Result<bool> {
+	fn unsubscribe(&self, _meta: Option<Self::Metadata>, _id: SubscriptionId) -> Result<bool> {
 		Ok(true)
 	}
 }

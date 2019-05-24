@@ -5,19 +5,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::Mutex;
 
-use core::{self, BoxFuture};
-use core::futures::{self, future, Sink as FuturesSink, Future};
-use core::futures::sync::oneshot;
+use crate::core::{self, BoxFuture};
+use crate::core::futures::{self, future, Sink as FuturesSink, Future};
+use crate::core::futures::sync::{mpsc, oneshot};
 
-use handler::{SubscribeRpcMethod, UnsubscribeRpcMethod};
-use types::{PubSubMetadata, SubscriptionId, TransportSender, TransportError, SinkResult};
+use crate::handler::{SubscribeRpcMethod, UnsubscribeRpcMethod};
+use crate::types::{PubSubMetadata, SubscriptionId, TransportSender, TransportError, SinkResult};
 
 /// RPC client session
 /// Keeps track of active subscriptions and unsubscribes from them upon dropping.
 pub struct Session {
 	active_subscriptions: Mutex<HashMap<(SubscriptionId, String), Box<Fn(SubscriptionId) + Send + 'static>>>,
 	transport: TransportSender,
-	on_drop: Mutex<Vec<Box<Fn() + Send>>>,
+	on_drop: Mutex<Vec<Box<FnMut() + Send>>>,
 }
 
 impl fmt::Debug for Session {
@@ -46,8 +46,13 @@ impl Session {
 	}
 
 	/// Adds a function to call when session is dropped.
-	pub fn on_drop(&self, on_drop: Box<Fn() + Send>) {
-		self.on_drop.lock().push(on_drop);
+	pub fn on_drop<F: FnOnce() + Send + 'static>(&self, on_drop: F) {
+		let mut func = Some(on_drop);
+		self.on_drop.lock().push(Box::new(move || {
+			if let Some(f) = func.take() {
+				f();
+			}
+		}));
 	}
 
 	/// Adds new active subscription
@@ -75,7 +80,7 @@ impl Drop for Session {
 		}
 
 		let mut on_drop = self.on_drop.lock();
-		for on_drop in on_drop.drain(..) {
+		for mut on_drop in on_drop.drain(..) {
 			on_drop();
 		}
 	}
@@ -99,11 +104,11 @@ impl Sink {
 		let notification = core::Notification {
 			jsonrpc: Some(core::Version::V2),
 			method: self.notification.clone(),
-			params: Some(val),
+			params: val,
 		};
 		(
 			core::to_string(&notification).expect("Notification serialization never fails."),
-			notification.params.expect("Always Some"),
+			notification.params,
 		)
 	}
 }
@@ -139,6 +144,26 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
+	/// Creates new subscriber.
+	///
+	/// Should only be used for tests.
+	pub fn new_test<T: Into<String>>(method: T) -> (
+		Self,
+		oneshot::Receiver<Result<SubscriptionId, core::Error>>,
+		mpsc::Receiver<String>,
+	) {
+		let (sender, id_receiver) = oneshot::channel();
+		let (transport, transport_receiver) = mpsc::channel(1);
+
+		let subscriber = Subscriber {
+			notification: method.into(),
+			transport,
+			sender,
+		};
+
+		(subscriber, id_receiver, transport_receiver)
+	}
+
 	/// Consumes `Subscriber` and assigns unique id to a requestor.
 	/// Returns `Err` if request has already terminated.
 	pub fn assign_id(self, id: SubscriptionId) -> Result<Sink, ()> {
@@ -163,18 +188,18 @@ impl Subscriber {
 pub fn new_subscription<M, F, G>(notification: &str, subscribe: F, unsubscribe: G) -> (Subscribe<F, G>, Unsubscribe<G>) where
 	M: PubSubMetadata,
 	F: SubscribeRpcMethod<M>,
-	G: UnsubscribeRpcMethod,
+	G: UnsubscribeRpcMethod<M>,
 {
 	let unsubscribe = Arc::new(unsubscribe);
 	let subscribe = Subscribe {
 		notification: notification.to_owned(),
-		subscribe: subscribe,
 		unsubscribe: unsubscribe.clone(),
+		subscribe,
 	};
 
 	let unsubscribe = Unsubscribe {
 		notification: notification.into(),
-		unsubscribe: unsubscribe,
+		unsubscribe,
 	};
 
 	(subscribe, unsubscribe)
@@ -206,7 +231,7 @@ pub struct Subscribe<F, G> {
 impl<M, F, G> core::RpcMethod<M> for Subscribe<F, G> where
 	M: PubSubMetadata,
 	F: SubscribeRpcMethod<M>,
-	G: UnsubscribeRpcMethod,
+	G: UnsubscribeRpcMethod<M>,
 {
 	fn call(&self, params: core::Params, meta: M) -> BoxFuture<core::Value> {
 		match meta.session() {
@@ -229,7 +254,7 @@ impl<M, F, G> core::RpcMethod<M> for Subscribe<F, G> where
 						futures::done(match result {
 							Ok(id) => {
 								session.add_subscription(&notification, &id, move |id| {
-									let _ = unsub.call(id).wait();
+									let _ = unsub.call(id, None).wait();
 								});
 								Ok(id.into())
 							},
@@ -251,7 +276,7 @@ pub struct Unsubscribe<G> {
 
 impl<M, G> core::RpcMethod<M> for Unsubscribe<G> where
 	M: PubSubMetadata,
-	G: UnsubscribeRpcMethod,
+	G: UnsubscribeRpcMethod<M>,
 {
 	fn call(&self, params: core::Params, meta: M) -> BoxFuture<core::Value> {
 		let id = match params {
@@ -263,7 +288,7 @@ impl<M, G> core::RpcMethod<M> for Unsubscribe<G> where
 		match (meta.session(), id) {
 			(Some(session), Some(id)) => {
 				session.remove_subscription(&self.notification, &id);
-				Box::new(self.unsubscribe.call(id))
+				Box::new(self.unsubscribe.call(id, Some(meta)))
 			},
 			(Some(_), None) => Box::new(future::err(core::Error::invalid_params("Expected subscription id."))),
 			_ => Box::new(future::err(subscriptions_unavailable())),
@@ -275,11 +300,11 @@ impl<M, G> core::RpcMethod<M> for Unsubscribe<G> where
 mod tests {
 	use std::sync::Arc;
 	use std::sync::atomic::{AtomicBool, Ordering};
-	use core;
-	use core::RpcMethod;
-	use core::futures::{Async, Future, Stream};
-	use core::futures::sync::{mpsc, oneshot};
-	use types::{SubscriptionId, PubSubMetadata};
+	use crate::core;
+	use crate::core::RpcMethod;
+	use crate::core::futures::{Async, Future, Stream};
+	use crate::core::futures::sync::{mpsc, oneshot};
+	use crate::types::{SubscriptionId, PubSubMetadata};
 
 	use super::{Session, Sink, Subscriber, new_subscription};
 
@@ -433,7 +458,7 @@ mod tests {
 				assert_eq!(params, core::Params::None);
 				called2.store(true, Ordering::SeqCst);
 			},
-			|_id| Ok(core::Value::Bool(true)),
+			|_id, _meta| Ok(core::Value::Bool(true)),
 		);
 		let meta = Metadata;
 

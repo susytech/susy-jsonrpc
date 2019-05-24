@@ -1,14 +1,13 @@
 use std::fmt;
 use std::sync::{atomic, Arc};
 
-use core::{self, futures};
-use core::futures::sync::mpsc;
-use server_utils::tokio_core::reactor::Remote;
-use server_utils::session;
-use ws;
+use crate::core::{self, futures};
+use crate::core::futures::sync::mpsc;
+use crate::server_utils::{session, tokio::runtime::TaskExecutor};
+use crate::ws;
 
-use error;
-use {Origin};
+use crate::error;
+use crate::{Origin};
 
 /// Output of WebSocket connection. Use this to send messages to the other endpoint.
 #[derive(Clone)]
@@ -74,7 +73,7 @@ pub struct RequestContext {
 	/// Direct channel to send messages to a client.
 	pub out: Sender,
 	/// Remote to underlying event loop.
-	pub remote: Remote,
+	pub executor: TaskExecutor,
 }
 
 impl RequestContext {
@@ -83,7 +82,7 @@ impl RequestContext {
 	pub fn sender(&self) -> mpsc::Sender<String> {
 		let out = self.out.clone();
 		let (sender, receiver) = mpsc::channel(1);
-		self.remote.spawn(move |_| SenderFuture(out, receiver));
+		self.executor.spawn(SenderFuture(out, receiver));
 		sender
 	}
 }
@@ -101,9 +100,7 @@ impl fmt::Debug for RequestContext {
 /// Metadata extractor from session data.
 pub trait MetaExtractor<M: core::Metadata>: Send + Sync + 'static {
 	/// Extract metadata for given session
-	fn extract(&self, _context: &RequestContext) -> M {
-		Default::default()
-	}
+	fn extract(&self, _context: &RequestContext) -> M;
 }
 
 impl<M, F> MetaExtractor<M> for F where
@@ -118,7 +115,9 @@ impl<M, F> MetaExtractor<M> for F where
 /// Dummy metadata extractor
 #[derive(Debug, Clone)]
 pub struct NoopExtractor;
-impl<M: core::Metadata> MetaExtractor<M> for NoopExtractor {}
+impl<M: core::Metadata + Default> MetaExtractor<M> for NoopExtractor {
+	fn extract(&self, _context: &RequestContext) -> M { M::default() }
+}
 
 struct SenderFuture(Sender, mpsc::Receiver<String>);
 impl futures::Future for SenderFuture {

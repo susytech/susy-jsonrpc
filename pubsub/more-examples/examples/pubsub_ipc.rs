@@ -6,30 +6,10 @@ use std::{time, thread};
 use std::sync::Arc;
 
 use susy_jsonrpc_core::*;
-use susy_jsonrpc_pubsub::{PubSubHandler, PubSubMetadata, Session, Subscriber, SubscriptionId};
+use susy_jsonrpc_pubsub::{PubSubHandler, Session, Subscriber, SubscriptionId};
 use susy_jsonrpc_ipc_server::{ServerBuilder, RequestContext, SessionStats, SessionId};
 
 use susy_jsonrpc_core::futures::Future;
-
-#[derive(Clone)]
-struct Meta {
-	session: Option<Arc<Session>>,
-}
-
-impl Default for Meta {
-	fn default() -> Self {
-		Meta {
-			session: None,
-		}
-	}
-}
-
-impl Metadata for Meta {}
-impl PubSubMetadata for Meta {
-	fn session(&self) -> Option<Arc<Session>> {
-		self.session.clone()
-	}
-}
 
 /// To test the server:
 ///
@@ -72,18 +52,13 @@ fn main() {
 				}
 			});
 		}),
-		("remove_hello", |_id: SubscriptionId| -> Result<Value> {
+		("remove_hello", |_id: SubscriptionId, _meta| -> Result<Value> {
 			println!("Closing subscription");
 			Ok(Value::Bool(true))
 		}),
 	);
 
-	let server = ServerBuilder::new(io)
-		.session_metadata_extractor(|context: &RequestContext| {
-			Meta {
-				session: Some(Arc::new(Session::new(context.sender.clone()))),
-			}
-		})
+	let server = ServerBuilder::with_meta_extractor(io, |context: &RequestContext| Arc::new(Session::new(context.sender.clone())))
 		.session_stats(Stats)
 		.start("./test.ipc")
 		.expect("Unable to start RPC server");

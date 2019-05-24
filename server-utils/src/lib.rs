@@ -5,12 +5,13 @@
 #[macro_use]
 extern crate log;
 
-extern crate globset;
-extern crate susy_jsonrpc_core as core;
-extern crate bytes;
+#[macro_use]
+extern crate lazy_static;
 
-pub extern crate tokio_core;
-pub extern crate tokio_io;
+use susy_jsonrpc_core as core;
+
+pub use tokio;
+pub use tokio_codec;
 
 pub mod cors;
 pub mod hosts;
@@ -18,11 +19,13 @@ pub mod session;
 pub mod reactor;
 mod matcher;
 mod stream_codec;
+mod suspendable_stream;
 
-pub use matcher::Pattern;
+pub use crate::suspendable_stream::SuspendableStream;
+pub use crate::matcher::Pattern;
 
 /// Codecs utilities
 pub mod codecs {
-    pub use stream_codec::{StreamCodec, Separator};
+    pub use crate::stream_codec::{StreamCodec, Separator};
 }
 

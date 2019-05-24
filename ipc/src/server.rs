@@ -1,19 +1,27 @@
+#![allow(deprecated)]
+
 use std;
 use std::sync::Arc;
 
 use tokio_service::{self, Service as TokioService};
-use jsonrpc::futures::{future, Future, Stream, Sink};
-use jsonrpc::futures::sync::{mpsc, oneshot};
-use jsonrpc::{FutureResult, Metadata, MetaIoHandler, Middleware, NoopMiddleware};
+use crate::jsonrpc::futures::{future, Future, Stream, Sink};
+use crate::jsonrpc::futures::sync::{mpsc, oneshot};
+use crate::jsonrpc::{middleware, FutureResult, Metadata, MetaIoHandler, Middleware};
 
-use server_utils::tokio_core::reactor::Remote;
-use server_utils::tokio_io::AsyncRead;
-use server_utils::{reactor, session, codecs};
+use crate::server_utils::{
+	tokio_codec::Framed,
+	tokio::{self, runtime::TaskExecutor, reactor::Handle},
+	reactor, session, codecs,
+};
+use parking_lot::Mutex;
 
-use meta::{MetaExtractor, NoopExtractor, RequestContext};
+use crate::meta::{MetaExtractor, NoopExtractor, RequestContext};
+use crate::select_with_weak::SelectWithWeakExt;
+use susy_tokio_ipc::Endpoint;
+pub use susy_tokio_ipc::SecurityAttributes;
 
 /// IPC server session
-pub struct Service<M: Metadata = (), S: Middleware<M> = NoopMiddleware> {
+pub struct Service<M: Metadata = (), S: Middleware<M> = middleware::Noop> {
 	handler: Arc<MetaIoHandler<M, S>>,
 	meta: M,
 }
@@ -31,7 +39,7 @@ impl<M: Metadata, S: Middleware<M>> tokio_service::Service for Service<M, S> {
 
 	type Error = ();
 
-	type Future = FutureResult<S::Future>;
+	type Future = FutureResult<S::Future, S::CallFuture>;
 
 	fn call(&self, req: Self::Request) -> Self::Future {
 		trace!(target: "ipc", "Received request: {}", req);
@@ -40,38 +48,52 @@ impl<M: Metadata, S: Middleware<M>> tokio_service::Service for Service<M, S> {
 }
 
 /// IPC server builder
-pub struct ServerBuilder<M: Metadata = (), S: Middleware<M> = NoopMiddleware> {
+pub struct ServerBuilder<M: Metadata = (), S: Middleware<M> = middleware::Noop> {
 	handler: Arc<MetaIoHandler<M, S>>,
 	meta_extractor: Arc<MetaExtractor<M>>,
 	session_stats: Option<Arc<session::SessionStats>>,
-	remote: reactor::UninitializedRemote,
+	executor: reactor::UninitializedExecutor,
 	incoming_separator: codecs::Separator,
 	outgoing_separator: codecs::Separator,
+	security_attributes: SecurityAttributes,
+	client_buffer_size: usize,
 }
 
-impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
-	///
+impl<M: Metadata + Default, S: Middleware<M>> ServerBuilder<M, S> {
+	/// Creates new IPC server build given the `IoHandler`.
 	pub fn new<T>(io_handler: T) -> ServerBuilder<M, S> where
 		T: Into<MetaIoHandler<M, S>>,
 	{
+		Self::with_meta_extractor(io_handler, NoopExtractor)
+	}
+}
+
+impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
+	/// Creates new IPC server build given the `IoHandler` and metadata extractor.
+	pub fn with_meta_extractor<T, E>(io_handler: T, extractor: E) -> ServerBuilder<M, S> where
+		T: Into<MetaIoHandler<M, S>>,
+		E: MetaExtractor<M>,
+	{
 		ServerBuilder {
 			handler: Arc::new(io_handler.into()),
-			meta_extractor: Arc::new(NoopExtractor),
+			meta_extractor: Arc::new(extractor),
 			session_stats: None,
-			remote: reactor::UninitializedRemote::Unspawned,
+			executor: reactor::UninitializedExecutor::Unspawned,
 			incoming_separator: codecs::Separator::Empty,
 			outgoing_separator: codecs::Separator::default(),
+			security_attributes: SecurityAttributes::empty(),
+			client_buffer_size: 5,
 		}
 	}
 
-	/// Sets shared different event loop remote.
-	pub fn event_loop_remote(mut self, remote: Remote) -> Self {
-		self.remote = reactor::UninitializedRemote::Shared(remote);
+	/// Sets shared different event loop executor.
+	pub fn event_loop_executor(mut self, executor: TaskExecutor) -> Self {
+		self.executor = reactor::UninitializedExecutor::Shared(executor);
 		self
 	}
 
 	/// Sets session metadata extractor.
-	pub fn session_metadata_extractor<X>(mut self, meta_extractor: X) -> Self where
+	pub fn session_meta_extractor<X>(mut self, meta_extractor: X) -> Self where
 		X: MetaExtractor<M>,
 	{
 		self.meta_extractor = Arc::new(meta_extractor);
@@ -91,9 +113,21 @@ impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
 		self
 	}
 
-	/// Run server (in a separate thread)
+	/// Sets the security attributes for the underlying IPC socket/pipe
+	pub fn set_security_attributes(mut self, attr: SecurityAttributes) -> Self {
+		self.security_attributes = attr;
+		self
+	}
+
+	/// Sets how many concurrent requests per client can be processed at any one time. Set to 5 by default.
+	pub fn set_client_buffer_size(mut self, buffer_size: usize) -> Self {
+		self.client_buffer_size = buffer_size;
+		self
+	}
+
+	/// Creates a new server from the given endpoint.
 	pub fn start(self, path: &str) -> std::io::Result<Server> {
-		let remote = self.remote.initialize()?;
+		let executor = self.executor.initialize()?;
 		let rpc_handler = self.handler;
 		let endpoint_addr = path.to_owned();
 		let meta_extractor = self.meta_extractor;
@@ -102,28 +136,30 @@ impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
 		let outgoing_separator = self.outgoing_separator;
 		let (stop_signal, stop_receiver) = oneshot::channel();
 		let (start_signal, start_receiver) = oneshot::channel();
+		let (wait_signal, wait_receiver) = oneshot::channel();
+		let security_attributes = self.security_attributes;
+		let client_buffer_size = self.client_buffer_size;
 
-		remote.remote().spawn(move |handle| {
-			use susy_tokio_ipc::Endpoint;
+		executor.spawn(future::lazy(move || {
+			let mut endpoint = Endpoint::new(endpoint_addr);
+			endpoint.set_security_attributes(security_attributes);
 
 			if cfg!(unix) {
 				// warn about existing file and remove it
-				if ::std::fs::remove_file(&endpoint_addr).is_ok() {
-					warn!("Removed existing file '{}'.", &endpoint_addr);
+				if ::std::fs::remove_file(endpoint.path()).is_ok() {
+					warn!("Removed existing file '{}'.", endpoint.path());
 				}
 			}
 
-			let listener = match Endpoint::new(endpoint_addr, handle) {
-				Ok(l) => l,
+			let endpoint_handle = Handle::current();
+			let connections = match endpoint.incoming(&endpoint_handle) {
+				Ok(connections) => connections,
 				Err(e) => {
 					start_signal.send(Err(e)).expect("Cannot fail since receiver never dropped before receiving");
 					return future::Either::A(future::ok(()));
 				}
 			};
 
-			start_signal.send(Ok(())).expect("Cannot fail since receiver never dropped before receiving");
-			let remote = handle.remote().clone();
-			let connections = listener.incoming();
 			let mut id = 0u64;
 
 			let server = connections.for_each(move |(io_stream, remote_id)| {
@@ -140,31 +176,33 @@ impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
 					sender,
 				});
 				let service = Service::new(rpc_handler.clone(), meta);
-				let (writer, reader) = io_stream.framed(
+				let (writer, reader) = Framed::new(
+					io_stream,
 					codecs::StreamCodec::new(
 						incoming_separator.clone(),
 						outgoing_separator.clone(),
-					)
+					),
 				).split();
-				let responses = reader.and_then(move |req| {
-					service.call(req).then(move |response| match response {
-						Err(e) => {
-							warn!(target: "ipc", "Error while processing request: {:?}", e);
-							future::ok(None)
-						},
-						Ok(None) => {
-							future::ok(None)
-						},
-						Ok(Some(response_data)) => {
-							trace!(target: "ipc", "Sent response: {}", &response_data);
-							future::ok(Some(response_data))
-						}
+				let responses = reader
+					.map(move |req| {
+						service.call(req)
+							.then(|result| {
+								match result {
+									Err(_) => {
+										future::ok(None)
+									}
+									Ok(some_result) => future::ok(some_result),
+								}
+							})
+							.map_err(|_:()| std::io::ErrorKind::Other.into())
 					})
-				})
-				.filter_map(|x| x)
-				.select(receiver.map_err(|e| {
-					warn!(target: "ipc", "Notification error: {:?}", e);
-					std::io::ErrorKind::Other.into()
+					.buffer_unordered(client_buffer_size)
+					.filter_map(|x| x)
+					// we use `select_with_weak` here, instead of `select`, to close the stream
+					// as soon as the ipc pipe is closed
+					.select_with_weak(receiver.map_err(|e| {
+						warn!(target: "ipc", "Notification error: {:?}", e);
+						std::io::ErrorKind::Other.into()
 				}));
 
 				let writer = writer.send_all(responses).then(move |_| {
@@ -173,21 +211,34 @@ impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
 					Ok(())
 				});
 
-				remote.spawn(|_| writer);
+				tokio::spawn(writer);
 
 				Ok(())
 			});
+			start_signal.send(Ok(())).expect("Cannot fail since receiver never dropped before receiving");
 
 			let stop = stop_receiver.map_err(|_| std::io::ErrorKind::Interrupted.into());
 			future::Either::B(
 				server.select(stop)
-					.map(|_| ())
+					.map(|_| {
+						let _ = wait_signal.send(());
+						()
+					})
 					.map_err(|_| ())
 			)
-		});
+		}));
+
+		let handle = InnerHandles {
+			executor: Some(executor),
+			stop: Some(stop_signal),
+			path: path.to_owned(),
+		};
 
 		match start_receiver.wait().expect("Message should always be sent") {
-			Ok(()) => Ok(Server { path: path.to_owned(), remote: Some(remote), stop: Some(stop_signal) }),
+			Ok(()) => Ok(Server {
+				handles: Arc::new(Mutex::new(handle)),
+				wait_handle: Some(wait_receiver),
+			}),
 			Err(e) => Err(e)
 		}
 	}
@@ -195,52 +246,88 @@ impl<M: Metadata, S: Middleware<M>> ServerBuilder<M, S> {
 
 
 /// IPC Server handle
+#[derive(Debug)]
 pub struct Server {
-	path: String,
-	remote: Option<reactor::Remote>,
-	stop: Option<oneshot::Sender<()>>,
+	handles: Arc<Mutex<InnerHandles>>,
+	wait_handle: Option<oneshot::Receiver<()>>,
 }
 
 impl Server {
 	/// Closes the server (waits for finish)
-	pub fn close(mut self) {
-		self.stop.take().map(|stop| stop.send(()));
-		self.remote.take().unwrap().close();
-		self.clear_file();
+	pub fn close(self) {
+		self.handles.lock().close();
+	}
+
+	/// Creates a close handle that can be used to stop the server remotely
+	pub fn close_handle(&self) -> CloseHandle {
+		CloseHandle {
+			inner: self.handles.clone(),
+		}
 	}
 
 	/// Wait for the server to finish
 	pub fn wait(mut self) {
-		self.remote.take().unwrap().wait();
+		self.wait_handle.take().map(|wait_receiver| wait_receiver.wait());
 	}
 
-	/// Remove socket file
-	fn clear_file(&self) {
+}
+
+
+#[derive(Debug)]
+struct InnerHandles {
+	executor: Option<reactor::Executor>,
+	stop: Option<oneshot::Sender<()>>,
+	path: String,
+}
+
+impl InnerHandles {
+	pub fn close(&mut self) {
+		let _ = self.stop.take().map(|stop| stop.send(()));
+		self.executor.take().map(|executor| executor.close());
 		let _ = ::std::fs::remove_file(&self.path); // ignore error, file could have been gone somewhere
 	}
 }
 
-impl Drop for Server {
+impl Drop for InnerHandles {
 	fn drop(&mut self) {
-		let _ = self.stop.take().map(|stop| stop.send(()));
-		self.remote.take().map(|remote| remote.close());
-		self.clear_file();
+		self.close();
+	}
+}
+/// `CloseHandle` allows one to stop an `IpcServer` remotely.
+#[derive(Clone)]
+pub struct CloseHandle {
+	inner: Arc<Mutex<InnerHandles>>,
+}
+
+impl CloseHandle {
+	/// `close` closes the corresponding `IpcServer` instance.
+	pub fn close(self) {
+		self.inner.lock().close();
 	}
 }
 
 #[cfg(test)]
 #[cfg(not(windows))]
 mod tests {
-	extern crate tokio_uds;
+	use tokio_uds;
 
 	use std::thread;
+	use std::sync::Arc;
+	use std::time;
+	use std::time::{Instant, Duration};
 	use super::{ServerBuilder, Server};
-	use jsonrpc::{MetaIoHandler, Value};
-	use jsonrpc::futures::{Future, future, Stream, Sink};
+	use crate::jsonrpc::{MetaIoHandler, Value};
+	use crate::jsonrpc::futures::{Future, future, Stream, Sink};
+	use crate::jsonrpc::futures::sync::{mpsc, oneshot};
 	use self::tokio_uds::UnixStream;
-	use server_utils::tokio_core::reactor::Core;
-	use server_utils::tokio_io::AsyncRead;
-	use server_utils::codecs;
+	use parking_lot::Mutex;
+	use crate::server_utils::{
+		tokio_codec::Decoder,
+		tokio::{self, timer::Delay}
+	};
+	use crate::server_utils::codecs;
+	use crate::meta::{MetaExtractor, RequestContext, NoopExtractor};
+	use super::SecurityAttributes;
 
 	fn server_builder() -> ServerBuilder {
 		let mut io = MetaIoHandler::<()>::default();
@@ -253,30 +340,31 @@ mod tests {
 	fn run(path: &str) -> Server {
 		let builder = server_builder();
 		let server = builder.start(path).expect("Server must run with no issues");
-		thread::sleep(::std::time::Duration::from_millis(50));
 		server
 	}
 
 	fn dummy_request_str(path: &str, data: &str) -> String {
-		let mut core = Core::new().expect("Tokio Core should be created with no errors");
+		let stream_future = UnixStream::connect(path);
+		let reply = stream_future.and_then(|stream| {
+			let stream = codecs::StreamCodec::stream_incoming()
+				.framed(stream);
+			let reply = stream
+				.send(data.to_owned())
+				.and_then(move |stream| {
+					stream.into_future().map_err(|(err, _)| err)
+				})
+				.and_then(|(reply, _)| {
+					future::ok(reply.expect("there should be one reply"))
+				});
+			reply
+		});
 
-		let stream = UnixStream::connect(path, &core.handle()).expect("Should have been connected to the server");
-		let (writer, reader) = stream.framed(codecs::StreamCodec::stream_incoming()).split();
-		let reply = writer
-			.send(data.to_owned())
-			.and_then(move |_| {
-				reader.into_future().map_err(|(err, _)| err)
-			})
-			.and_then(|(reply, _)| {
-				future::ok(reply.expect("there should be one reply"))
-			});
-
-		core.run(reply).unwrap()
+		reply.wait().expect("wait for reply")
 	}
 
 	#[test]
 	fn start() {
-		::logger::init_log();
+		crate::logger::init_log();
 
 		let mut io = MetaIoHandler::<()>::default();
 		io.add_method("say_hello", |_params| {
@@ -290,43 +378,50 @@ mod tests {
 
 	#[test]
 	fn connect() {
-		::logger::init_log();
+		crate::logger::init_log();
 		let path = "/tmp/test-ipc-30000";
 		let _server = run(path);
 
-		let core = Core::new().expect("Tokio Core should be created with no errors");
-		UnixStream::connect(path, &core.handle()).expect("Socket should connect");
+		UnixStream::connect(path).wait().expect("Socket should connect");
 	}
 
 	#[test]
 	fn request() {
-		::logger::init_log();
+		crate::logger::init_log();
 		let path = "/tmp/test-ipc-40000";
-		let _server = run(path);
+		let server = run(path);
+		let (stop_signal, stop_receiver) = oneshot::channel();
 
-		let result = dummy_request_str(
-			path,
-			"{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}",
-			);
+		let t = thread::spawn(move || {
+			let result = dummy_request_str(
+				path,
+				"{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}",
+				);
+			stop_signal.send(result).unwrap();
+		});
+		t.join().unwrap();
 
-		assert_eq!(
-			result,
-			"{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}",
-			"Response does not exactly match the expected response",
+		let _ = stop_receiver.map(move |result: String| {
+			assert_eq!(
+				result,
+				"{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}",
+				"Response does not exactly match the expected response",
 			);
+			server.close();
+		}).wait();
 	}
 
 	#[test]
 	fn req_parallel() {
-		use std::thread;
-
-		::logger::init_log();
+		crate::logger::init_log();
 		let path = "/tmp/test-ipc-45000";
-		let _server = run(path);
+		let server = run(path);
+		let (stop_signal, stop_receiver) = mpsc::channel(400);
 
 		let mut handles = Vec::new();
 		for _ in 0..4 {
 			let path = path.clone();
+			let mut stop_signal = stop_signal.clone();
 			handles.push(
 				thread::spawn(move || {
 					for _ in 0..100 {
@@ -334,14 +429,7 @@ mod tests {
 							&path,
 							"{\"jsonrpc\": \"2.0\", \"method\": \"say_hello\", \"params\": [42, 23], \"id\": 1}",
 							);
-
-						assert_eq!(
-							result,
-							"{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}",
-							"Response does not exactly match the expected response",
-							);
-
-						::std::thread::sleep(::std::time::Duration::from_millis(10));
+						stop_signal.try_send(result).unwrap();
 					}
 				})
 			);
@@ -350,18 +438,26 @@ mod tests {
 		for handle in handles.drain(..) {
 			handle.join().unwrap();
 		}
+
+		let _ = stop_receiver.map(|result| {
+			assert_eq!(
+				result,
+				"{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}",
+				"Response does not exactly match the expected response",
+				);
+		}).take(400).collect().wait();
+		server.close();
 	}
 
 	#[test]
 	fn close() {
-		::logger::init_log();
+		crate::logger::init_log();
 		let path = "/tmp/test-ipc-50000";
 		let server = run(path);
 		server.close();
 
 		assert!(::std::fs::metadata(path).is_err(), "There should be no socket file left");
-		let core = Core::new().expect("Tokio Core should be created with no errors");
-		assert!(UnixStream::connect(path, &core.handle()).is_err(), "Connection to the closed socket should fail");
+		assert!(UnixStream::connect(path).wait().is_err(), "Connection to the closed socket should fail");
 	}
 
 	fn huge_response_test_str() -> String {
@@ -382,6 +478,7 @@ mod tests {
 
 	#[test]
 	fn test_huge_response() {
+		crate::logger::init_log();
 		let path = "/tmp/test-ipc-60000";
 
 		let mut io = MetaIoHandler::<()>::default();
@@ -390,21 +487,134 @@ mod tests {
 		});
 		let builder = ServerBuilder::new(io);
 
-		let _server = builder.start(path).expect("Server must run with no issues");
-		thread::sleep(::std::time::Duration::from_millis(50));
+		let server = builder.start(path).expect("Server must run with no issues");
+		let (stop_signal, stop_receiver) = oneshot::channel();
 
-		let result = dummy_request_str(&path,
-			"{\"jsonrpc\": \"2.0\", \"method\": \"say_huge_hello\", \"params\": [], \"id\": 1}",
-		);
-
-		assert_eq!(
-			result,
-			huge_response_test_json(),
-			"Response does not exactly match the expected response",
+		let t = thread::spawn(move || {
+			let result = dummy_request_str(
+				&path,
+				"{\"jsonrpc\": \"2.0\", \"method\": \"say_huge_hello\", \"params\": [], \"id\": 1}",
 			);
 
+			stop_signal.send(result).unwrap();
+		});
+		t.join().unwrap();
+
+		let _ = stop_receiver.map(move |result: String| {
+			assert_eq!(
+				result,
+				huge_response_test_json(),
+				"Response does not exactly match the expected response",
+			);
+			server.close();
+		}).wait();
 	}
 
+	#[test]
+	fn test_session_end() {
+		struct SessionEndMeta {
+			drop_signal: Option<oneshot::Sender<()>>,
+		}
 
+		impl Drop for SessionEndMeta {
+			fn drop(&mut self) {
+				trace!(target: "ipc", "Dropping session meta");
+				self.drop_signal.take().unwrap().send(()).unwrap()
+			}
+		}
 
+		struct SessionEndExtractor {
+			drop_receivers: Arc<Mutex<mpsc::Sender<oneshot::Receiver<()>>>>,
+		}
+
+		impl MetaExtractor<Arc<SessionEndMeta>> for SessionEndExtractor {
+			fn extract(&self, _context: &RequestContext) -> Arc<SessionEndMeta> {
+				let (signal, receiver) = oneshot::channel();
+				self.drop_receivers.lock().try_send(receiver).unwrap();
+				let meta = SessionEndMeta {
+					drop_signal: Some(signal),
+				};
+				Arc::new(meta)
+			}
+		}
+
+		crate::logger::init_log();
+		let path = "/tmp/test-ipc-30009";
+		let (signal, receiver) = mpsc::channel(16);
+		let session_metadata_extractor = SessionEndExtractor {
+			drop_receivers: Arc::new(Mutex::new(signal))
+		};
+
+		let io = MetaIoHandler::<Arc<SessionEndMeta>>::default();
+		let builder = ServerBuilder::with_meta_extractor(io, session_metadata_extractor);
+		let server = builder.start(path).expect("Server must run with no issues");
+		{
+			let _ = UnixStream::connect(path).wait().expect("Socket should connect");
+		}
+
+		receiver.into_future()
+			.map_err(|_| ())
+			.and_then(|drop_receiver| drop_receiver.0.unwrap().map_err(|_| ()))
+			.wait().unwrap();
+		server.close();
+	}
+
+	#[test]
+	fn close_handle() {
+		crate::logger::init_log();
+		let path = "/tmp/test-ipc-90000";
+		let server = run(path);
+		let handle = server.close_handle();
+		handle.close();
+		assert!(UnixStream::connect(path).wait().is_err(), "Connection to the closed socket should fail");
+	}
+
+	#[test]
+	fn close_when_waiting() {
+		crate::logger::init_log();
+		let path = "/tmp/test-ipc-70000";
+		let server = run(path);
+		let close_handle = server.close_handle();
+		let (tx, rx) = oneshot::channel();
+
+		thread::spawn(move || {
+			thread::sleep(time::Duration::from_millis(100));
+			close_handle.close();
+		});
+		thread::spawn(move || {
+			server.wait();
+			tx.send(true).expect("failed to report that the server has stopped");
+		});
+
+		let delay = Delay::new(Instant::now() + Duration::from_millis(500))
+			.map(|_| false)
+			.map_err(|err| panic!("{:?}", err));
+
+		let result_fut = rx
+			.map_err(|_| ())
+			.select(delay)
+			.then(move |result| {
+				match result {
+					Ok((result, _)) => {
+						assert_eq!(result, true, "Wait timeout exceeded");
+						assert!(UnixStream::connect(path).wait().is_err(),
+							"Connection to the closed socket should fail");
+						Ok(())
+					},
+					Err(_) => Err(()),
+				}
+			});
+
+		tokio::run(result_fut);
+	}
+
+	#[test]
+	fn runs_with_security_attributes() {
+		let path = "/tmp/test-ipc-9001";
+		let io = MetaIoHandler::<Arc<()>>::default();
+		ServerBuilder::with_meta_extractor(io, NoopExtractor)
+			.set_security_attributes(SecurityAttributes::empty())
+			.start(path)
+			.expect("Server must run with no issues");
+	}
 }
